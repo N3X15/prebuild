@@ -435,12 +435,14 @@ namespace Prebuild.Core
 				{
 					XmlValidatingReader validator = new XmlValidatingReader(new XmlTextReader(new StringReader(xml)));
 
+#if XML_VALIDATE_SCHEME
 					//validate while reading from string into XmlDocument DOM structure in memory
 					foreach(XmlSchema schema in m_Schemas) 
 					{
 						validator.Schemas.Add(schema);
 					}
-					m_CurrentDoc.Load(validator);
+#endif
+                   m_CurrentDoc.Load(validator);
 				} 
 				catch(XmlException e) 
 				{
