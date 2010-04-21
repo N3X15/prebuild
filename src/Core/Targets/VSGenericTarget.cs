@@ -254,7 +254,7 @@ namespace Prebuild.Core.Targets
                     compilerDefines += "VISUAL_STUDIO";
 
 					ps.Write("  <PropertyGroup ");
-					ps.WriteLine("Condition=\" '$(Configuration)|$(Platform)' == '{0}|AnyCPU' \">", conf.Name);
+					ps.WriteLine("Condition=\" '$(Configuration)|$(Platform)' == '{0}|{1}' \">", conf.Name, conf.Options.PlatformTarget);
 					ps.WriteLine("    <AllowUnsafeBlocks>{0}</AllowUnsafeBlocks>", conf.Options["AllowUnsafe"]);
 					ps.WriteLine("    <BaseAddress>{0}</BaseAddress>", conf.Options["BaseAddress"]);
 					ps.WriteLine("    <CheckForOverflowUnderflow>{0}</CheckForOverflowUnderflow>", conf.Options["CheckUnderflowOverflow"]);
@@ -389,9 +389,6 @@ namespace Prebuild.Core.Targets
 					//					}
 
 					SubType subType = project.Files.GetSubType(file);
-
-                    if (file.EndsWith("Settings.Designer.cs"))
-                        subType = SubType.Settings;
 
 					if (subType != SubType.Code && subType != SubType.Settings && subType != SubType.Designer
 						&& subType != SubType.CodeBehind)
@@ -571,7 +568,7 @@ namespace Prebuild.Core.Targets
 				ps.WriteLine("  <PropertyGroup>");
 				//ps.WriteLine("      <Settings ReferencePath=\"{0}\">", MakeRefPath(project));
 				ps.WriteLine("    <Configuration Condition=\" '$(Configuration)' == '' \">Debug</Configuration>");
-				ps.WriteLine("    <Platform Condition=\" '$(Platform)' == '' \">AnyCPU</Platform>");
+				ps.WriteLine("    <Platform Condition=\" '$(Platform)' == '' \">" + project.Configurations +  "</Platform>");
 				ps.WriteLine("    <ReferencePath>{0}</ReferencePath>", MakeRefPath(project));
 				ps.WriteLine("    <LastOpenVersion>{0}</LastOpenVersion>", this.ProductVersion);
 				ps.WriteLine("    <ProjectView>ProjectFiles</ProjectView>");
@@ -580,7 +577,7 @@ namespace Prebuild.Core.Targets
 				foreach (ConfigurationNode conf in project.Configurations)
 				{
 					ps.Write("  <PropertyGroup");
-					ps.Write(" Condition = \" '$(Configuration)|$(Platform)' == '{0}|AnyCPU' \"", conf.Name);
+					ps.Write(" Condition = \" '$(Configuration)|$(Platform)' == '{0}|{1}' \"", conf.Name, conf.Options.PlatformTarget);
 					ps.WriteLine(" />");
 				}
 				//ps.WriteLine("      </Settings>");
@@ -654,7 +651,7 @@ namespace Prebuild.Core.Targets
 					ss.WriteLine("\tGlobalSection(SolutionConfigurationPlatforms) = preSolution");
 					foreach (ConfigurationNode conf in solution.Configurations)
 					{
-						ss.WriteLine("\t\t{0}|Any CPU = {0}|Any CPU", conf.Name);
+						ss.WriteLine("\t\t{0}|{1} = {0}|{1}", conf.Name, conf.Options.PlatformTarget);
 					}
 					ss.WriteLine("\tEndGlobalSection");
 
@@ -740,13 +737,13 @@ namespace Prebuild.Core.Targets
 			{
 				foreach (ConfigurationNode conf in configurations)
 				{
-					ss.WriteLine("\t\t{0}.{1}|Any CPU.ActiveCfg = {1}|Any CPU",
+                    ss.WriteLine("\t\t{0}.{1}|{2}.ActiveCfg = {1}|{2}",
 						project.Guid.ToString("B").ToUpper(),
-						conf.Name);
+						conf.Name, conf.Options.PlatformTarget);
 
-					ss.WriteLine("\t\t{0}.{1}|Any CPU.Build.0 = {1}|Any CPU",
+					ss.WriteLine("\t\t{0}.{1}|{2}.Build.0 = {1}|{2}",
 						project.Guid.ToString("B").ToUpper(),
-						conf.Name);
+						conf.Name, conf.Options.PlatformTarget);
 				}
 			}
 
