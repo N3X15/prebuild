@@ -491,9 +491,19 @@ namespace Prebuild.Core.Targets
 							
 							ps.WriteLine("Include=\"{0}\">", path);
 
-							int last_period_index = file.LastIndexOf('.');
-							string short_file_name = file.Substring(0, last_period_index);
-							string extension = Path.GetExtension(path);
+                            string short_file_name;
+                            string extension;
+                            int last_period_index = file.LastIndexOf('.');
+                            if (last_period_index != -1)
+                            {
+                                short_file_name = file.Substring(0, last_period_index);
+                                extension = Path.GetExtension(path);
+                            }
+                            else
+                            {
+                                short_file_name = file;
+                                extension = String.Empty;
+                            }
 							string designer_format = string.Format(".designer{0}", extension);
 
                             if (path_lower.EndsWith(designer_format))
