@@ -136,7 +136,9 @@ namespace Prebuild
 			Console.WriteLine("/pause           Pauses the application after execution to view the output");
 			Console.WriteLine("/yes             Default to yes to any questions asked");
 			Console.WriteLine("/install         Install assembly into the GAC");
-			Console.WriteLine("/remove          Remove assembly from the GAC");
+            Console.WriteLine("/remove          Remove assembly from the GAC");
+            Console.WriteLine("/exclude         Exclude project from list of project groups (| separated list)");
+            Console.WriteLine("/allow           Only include projects from list of project groups (| separated lis)");
 			Console.WriteLine();
 			Console.WriteLine("See 'prebuild /showtargets for a list of available targets");
 			Console.WriteLine("See readme.txt or check out http://dnpb.sourceforge.net for more information");

@@ -614,8 +614,11 @@ namespace Prebuild.Core.Targets
 
 			foreach (ProjectNode project in solution.Projects)
 			{
-				kernel.Log.Write("...Creating project: {0}", project.Name);
-				WriteProject(solution, project);
+                if (Kernel.Instance.AllowProject(project.FilterGroups))
+                {
+                    kernel.Log.Write("...Creating project: {0}", project.Name);
+                    WriteProject(solution, project);
+                }
 			}
 
 			foreach (DatabaseProjectNode project in solution.DatabaseProjects)
@@ -651,6 +654,9 @@ namespace Prebuild.Core.Targets
                             break;
                         case VSVersion.VS10:
                             ss.WriteLine("# Visual Studio 2010");
+                            break;
+                        case VSVersion.VS11:
+                            ss.WriteLine("# Visual Studio 2012");
                             break;
                     }
 
@@ -696,7 +702,10 @@ namespace Prebuild.Core.Targets
 
 			foreach (ProjectNode project in embeddedSolution.Projects)
 			{
-				WriteProject(actualSolution, writer, project);
+                if (Kernel.Instance.AllowProject(project.FilterGroups))
+                {
+                    WriteProject(actualSolution, writer, project);
+                }
 			}
 
 			foreach (DatabaseProjectNode dbProject in embeddedSolution.DatabaseProjects)

@@ -25,7 +25,7 @@ namespace Prebuild.Core.Targets
         string schemaVersion = "2.0";
         string versionName = "Visual Studio 2012";
         string name = "vs2012";
-        VSVersion version = VSVersion.VS10;
+        VSVersion version = VSVersion.VS11;
 
         Hashtable tools;
         Kernel kernel;

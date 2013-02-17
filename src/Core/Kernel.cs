@@ -107,6 +107,7 @@ namespace Prebuild.Core
 		XmlDocument m_CurrentDoc;
 		bool m_PauseAfterFinish;
 		string[] m_ProjectGroups;
+        string[] m_ExcludedGroups;
 		StringCollection m_Refs;
 
 		
@@ -521,9 +522,23 @@ namespace Prebuild.Core
 		/// <returns></returns>
 		public bool AllowProject(string projectGroupsFlags) 
 		{
+            if (m_ExcludedGroups != null && m_ExcludedGroups.Length > 0)
+            {
+                if (!string.IsNullOrEmpty(projectGroupsFlags))
+                {
+                    foreach (string group in projectGroupsFlags.Split('|'))
+                    {
+                        if (Array.IndexOf(m_ExcludedGroups, group) != -1)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
 			if(m_ProjectGroups != null && m_ProjectGroups.Length > 0) 
 			{
-				if(projectGroupsFlags != null && projectGroupsFlags.Length == 0) 
+				if(!string.IsNullOrEmpty(projectGroupsFlags)) 
 				{
 					foreach(string group in projectGroupsFlags.Split('|')) 
 					{
@@ -650,7 +665,7 @@ namespace Prebuild.Core
 			{
 				logFile = m_CommandLine["log"];
 
-				if(logFile != null && logFile.Length == 0)
+				if(string.IsNullOrEmpty(logFile))
 				{
 					logFile = "Prebuild.log";
 				}
@@ -668,16 +683,23 @@ namespace Prebuild.Core
 			m_Target = m_CommandLine["target"];
 			m_Clean = m_CommandLine["clean"];
 			string removeDirs = m_CommandLine["removedir"];
-			if(removeDirs != null && removeDirs.Length == 0) 
+			if(!string.IsNullOrEmpty(removeDirs)) 
 			{
 				m_RemoveDirectories = removeDirs.Split('|');
 			}
 
-			string flags = m_CommandLine["allowedgroups"];//allows filtering by specifying a pipe-delimited list of groups to include
-			if(flags != null && flags.Length == 0)
+			string flags = m_CommandLine["allow"];//allows filtering by specifying a pipe-delimited list of groups to include
+			if(!string.IsNullOrEmpty(flags))
 			{
 				m_ProjectGroups = flags.Split('|');
 			}
+
+            string excluded = m_CommandLine["exclude"];//allows filtering by specifying a pipe-delimited list of groups to exclude
+            if (!string.IsNullOrEmpty(excluded))
+            {
+                m_ExcludedGroups = excluded.Split('|');
+            }
+
 			m_PauseAfterFinish = m_CommandLine.WasPassed("pause");
 
 			LoadSchema();
