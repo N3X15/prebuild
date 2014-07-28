@@ -27,8 +27,10 @@ namespace Prebuild.Core.Targets
         string name = "vs2012";
         VSVersion version = VSVersion.VS11;
 
+        /*
         Hashtable tools;
         Kernel kernel;
+        */
 
         /// <summary>
         /// Gets or sets the solution version.
@@ -95,6 +97,27 @@ namespace Prebuild.Core.Targets
             {
                 return name;
             }
+        }
+
+        protected override string GetToolsVersionXml(FrameworkVersion frameworkVersion)
+        {
+            switch (frameworkVersion)
+            {
+                case FrameworkVersion.v4_5_1:
+                case FrameworkVersion.v4_5:
+                case FrameworkVersion.v4_0:
+                case FrameworkVersion.v3_5:
+                    return "ToolsVersion=\"4.0\"";
+                case FrameworkVersion.v3_0:
+                    return "ToolsVersion=\"3.0\"";
+                default:
+                    return "ToolsVersion=\"2.0\"";
+            }
+        }
+
+        public override string SolutionTag
+        {
+            get { return "# Visual Studio 2012"; }
         }
         #endregion
 
