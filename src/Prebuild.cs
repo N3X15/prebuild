@@ -26,9 +26,9 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,	EVEN IF	ADVISED	OF THE POSSIBILITY O
 #region	CVS	Information
 /*
  * $Source$
- * $Author: jendave $
- * $Date: 2006-09-26 14:43:35 -0700 (Tue, 26 Sep 2006) $
- * $Revision: 168 $
+ * $Author: kunnis $
+ * $Date: 2009-04-14 21:33:14 -0400 (Tue, 14 Apr 2009) $
+ * $Revision: 308 $
  */
 #endregion
 
@@ -86,17 +86,17 @@ namespace Prebuild
 				{
 					kernel.Process();
 				}
-			}
-			catch(Exception	ex)	
-			{
-				Console.WriteLine("Unhandled error:	{0}", ex.Message);
-				//#if DEBUG
-				Console.WriteLine("{0}", ex.StackTrace);
-				//#endif
-			}
-			finally
-			{
-				if(kernel.PauseAfterFinish)	
+            }
+#if !DEBUG
+            catch (Exception ex)
+            {
+                Console.WriteLine("Unhandled error:	{0}", ex.Message);
+                Console.WriteLine("{0}", ex.StackTrace);
+            }
+#endif
+            finally
+            {
+				if(kernel != null && kernel.PauseAfterFinish)	
 				{
 					Console.WriteLine("\nPress enter to continue...");
 					Console.ReadLine();
@@ -136,9 +136,7 @@ namespace Prebuild
 			Console.WriteLine("/pause           Pauses the application after execution to view the output");
 			Console.WriteLine("/yes             Default to yes to any questions asked");
 			Console.WriteLine("/install         Install assembly into the GAC");
-            Console.WriteLine("/remove          Remove assembly from the GAC");
-            Console.WriteLine("/exclude         Exclude project from list of project groups (| separated list)");
-            Console.WriteLine("/allow           Only include projects from list of project groups (| separated lis)");
+			Console.WriteLine("/remove          Remove assembly from the GAC");
 			Console.WriteLine();
 			Console.WriteLine("See 'prebuild /showtargets for a list of available targets");
 			Console.WriteLine("See readme.txt or check out http://dnpb.sourceforge.net for more information");

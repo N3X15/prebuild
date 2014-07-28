@@ -23,15 +23,6 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY O
 */
 #endregion
 
-#region CVS Information
-/*
- * $Source$
- * $Author: sontek $
- * $Date: 2008-05-07 13:59:35 -0700 (Wed, 07 May 2008) $
- * $Revision: 270 $
- */
-#endregion
-
 using System;
 using System.Xml;
 
@@ -44,7 +35,7 @@ namespace Prebuild.Core.Nodes
 	/// <summary>
 	/// 
 	/// </summary>
-	public class DataNode : IDataNode
+	public abstract class DataNode : IDataNode
 	{
 		#region Fields
 
@@ -108,17 +99,17 @@ namespace Prebuild.Core.Nodes
 			{
 				return SubType.Settings;
 			}
-            //else
-            //{
+			else
+			{
 				
-            //    foreach (string type in WebTypes)
-            //    {
-            //        if (path.EndsWith(string.Format("{0}{1}", type, extension)))
-            //        {
-            //            return SubType.CodeBehind;
-            //        }
-            //    }
-            //}
+				foreach (string type in WebTypes)
+				{
+                    if (path.EndsWith(type))
+					{
+						return SubType.CodeBehind;
+					}
+				}
+			}
 			return SubType.Code;
 		}
 		#endregion

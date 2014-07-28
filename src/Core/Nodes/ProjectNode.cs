@@ -23,17 +23,8 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY O
 */
 #endregion
 
-#region CVS Information
-/*
- * $Source$
- * $Author: sontek $
- * $Date: 2008-06-16 16:37:58 -0700 (Mon, 16 Jun 2008) $
- * $Revision: 275 $
- */
-#endregion
-
 using System;
-using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 
@@ -98,20 +89,24 @@ namespace Prebuild.Core.Nodes
 		/// .NET 3.5
 		/// </summary>
 		v3_5,
-        /// <summary>
-        /// .NET 4.0
-        /// </summary>
-        v4_0,
+		/// <summary>
+		/// .NET 4.0
+		/// </summary>
+		v4_0,
         /// <summary>
         /// .NET 4.5
         /// </summary>
         v4_5,
+        /// <summary>
+        /// .NET 4.5.1
+        /// </summary>
+        v4_5_1
     }
 	/// <summary>
 	/// The Node object representing /Prebuild/Solution/Project elements
 	/// </summary>
 	[DataNode("Project")]
-	public class ProjectNode : DataNode
+	public class ProjectNode : DataNode, IComparable
 	{
 		#region Fields
 
@@ -131,27 +126,13 @@ namespace Prebuild.Core.Nodes
 		private string m_FilterGroups = "";
 		private string m_Version = "";
 		private Guid m_Guid;
+        private string m_DebugStartParameters;
 
-		private Hashtable m_Configurations;
-		private ArrayList m_ReferencePaths;
-		private ArrayList m_References;
-		private ArrayList m_Authors;
+        private readonly Dictionary<string, ConfigurationNode> m_Configurations = new Dictionary<string, ConfigurationNode>();
+        private readonly List<ReferencePathNode> m_ReferencePaths = new List<ReferencePathNode>();
+		private readonly List<ReferenceNode> m_References = new List<ReferenceNode>();
+        private readonly List<AuthorNode> m_Authors = new List<AuthorNode>();
 		private FilesNode m_Files;
-
-		#endregion
-
-		#region Constructors
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="ProjectNode"/> class.
-		/// </summary>
-		public ProjectNode()
-		{
-			m_Configurations = new Hashtable();
-			m_ReferencePaths = new ArrayList();
-			m_References = new ArrayList();
-			m_Authors = new ArrayList();
-		}
 
 		#endregion
 
@@ -175,7 +156,7 @@ namespace Prebuild.Core.Nodes
 		{
 			get
 			{
-			    return this.m_Framework;
+			    return m_Framework;
 			}
 		}
 		/// <summary>
@@ -309,7 +290,7 @@ namespace Prebuild.Core.Nodes
 			}
 		}
 
-		private bool m_GenerateAssemblyInfoFile = false;
+		private bool m_GenerateAssemblyInfoFile;
 		
 		/// <summary>
 		/// 
@@ -354,11 +335,13 @@ namespace Prebuild.Core.Nodes
 		/// Gets the configurations.
 		/// </summary>
 		/// <value>The configurations.</value>
-		public ICollection Configurations
+        public List<ConfigurationNode> Configurations
 		{
 			get
 			{
-				return m_Configurations.Values;
+			    List<ConfigurationNode> tmp = new List<ConfigurationNode>(ConfigurationsTable.Values);
+                tmp.Sort();
+                return tmp;
 			}
 		}
 
@@ -366,7 +349,7 @@ namespace Prebuild.Core.Nodes
 		/// Gets the configurations table.
 		/// </summary>
 		/// <value>The configurations table.</value>
-		public Hashtable ConfigurationsTable
+		public Dictionary<string, ConfigurationNode> ConfigurationsTable
 		{
 			get
 			{
@@ -378,11 +361,13 @@ namespace Prebuild.Core.Nodes
 		/// Gets the reference paths.
 		/// </summary>
 		/// <value>The reference paths.</value>
-		public ArrayList ReferencePaths
+		public List<ReferencePathNode> ReferencePaths
 		{
 			get
 			{
-				return m_ReferencePaths;
+                List<ReferencePathNode> tmp = new List<ReferencePathNode>(m_ReferencePaths);
+                tmp.Sort();
+                return tmp;
 			}
 		}
 
@@ -390,11 +375,13 @@ namespace Prebuild.Core.Nodes
 		/// Gets the references.
 		/// </summary>
 		/// <value>The references.</value>
-		public ArrayList References
+        public List<ReferenceNode> References
 		{
 			get
 			{
-				return m_References;
+                List<ReferenceNode> tmp = new List<ReferenceNode>(m_References);
+                tmp.Sort();
+                return tmp;
 			}
 		}
 		
@@ -402,7 +389,7 @@ namespace Prebuild.Core.Nodes
 		/// Gets the Authors list.
 		/// </summary>
 		/// <value>The list of the project's authors.</value>
-		public ArrayList Authors
+		public List<AuthorNode> Authors
 		{
 			get
 			{
@@ -440,7 +427,7 @@ namespace Prebuild.Core.Nodes
 					SolutionNode parent = (SolutionNode)base.Parent;
 					foreach(ConfigurationNode conf in parent.Configurations)
 					{
-						m_Configurations[conf.Name] = conf.Clone();
+						m_Configurations[conf.NameAndPlatform] = (ConfigurationNode) conf.Clone();
 					}
 				}
 			}
@@ -458,7 +445,15 @@ namespace Prebuild.Core.Nodes
 			}
 		}
 
-		#endregion
+	    public string DebugStartParameters
+	    {
+            get
+            {
+                return m_DebugStartParameters;
+            }
+	    }
+
+	    #endregion
 
 		#region Private Methods
 
@@ -467,19 +462,19 @@ namespace Prebuild.Core.Nodes
 			if(String.Compare(conf.Name, "all", true) == 0) //apply changes to all, this may not always be applied first,
 				//so it *may* override changes to the same properties for configurations defines at the project level
 			{
-				foreach(ConfigurationNode confNode in this.m_Configurations.Values) 
+				foreach(ConfigurationNode confNode in m_Configurations.Values) 
 				{
 					conf.CopyTo(confNode);//update the config templates defines at the project level with the overrides
 				}
 			}
-			if(m_Configurations.ContainsKey(conf.Name))
+			if(m_Configurations.ContainsKey(conf.NameAndPlatform))
 			{
-				ConfigurationNode parentConf = (ConfigurationNode)m_Configurations[conf.Name];
+				ConfigurationNode parentConf = m_Configurations[conf.NameAndPlatform];
 				conf.CopyTo(parentConf);//update the config templates defines at the project level with the overrides
 			} 
 			else
 			{
-				m_Configurations[conf.Name] = conf;
+				m_Configurations[conf.NameAndPlatform] = conf;
 			}
 		}
 
@@ -508,17 +503,20 @@ namespace Prebuild.Core.Nodes
 			m_StartupObject = Helper.AttributeValue(node, "startupObject", m_StartupObject);
 			m_RootNamespace = Helper.AttributeValue(node, "rootNamespace", m_RootNamespace);
 			
-			string guid = Helper.AttributeValue(node, "guid", Guid.NewGuid().ToString());
+            int hash = m_Name.GetHashCode();
+ 			Guid guidByHash = new Guid(hash, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+			string guid = Helper.AttributeValue(node, "guid", guidByHash.ToString());
 			m_Guid = new Guid(guid);
 
             m_GenerateAssemblyInfoFile = Helper.ParseBoolean(node, "generateAssemblyInfoFile", false);
+		    m_DebugStartParameters = Helper.AttributeValue(node, "debugStartParameters", string.Empty);
             
-			if(m_AssemblyName == null || m_AssemblyName.Length < 1)
+			if(string.IsNullOrEmpty(m_AssemblyName))
 			{
 				m_AssemblyName = m_Name;
 			}
 
-			if(m_RootNamespace == null || m_RootNamespace.Length < 1)
+			if(string.IsNullOrEmpty(m_RootNamespace))
 			{
 				m_RootNamespace = m_Name;
 			}
@@ -552,15 +550,15 @@ namespace Prebuild.Core.Nodes
 					}
 					else if(dataNode is ReferencePathNode)
 					{
-						m_ReferencePaths.Add(dataNode);
+                        m_ReferencePaths.Add((ReferencePathNode)dataNode);
 					}
 					else if(dataNode is ReferenceNode)
 					{
-						m_References.Add(dataNode);
+                        m_References.Add((ReferenceNode)dataNode);
 					}
 					else if(dataNode is AuthorNode)
 					{
-						m_Authors.Add(dataNode);
+                        m_Authors.Add((AuthorNode)dataNode);
 					}
 					else if(dataNode is FilesNode)
 					{
@@ -574,6 +572,15 @@ namespace Prebuild.Core.Nodes
 			}
 		}
 
+		#endregion
+
+        #region IComparable Members
+
+        public int CompareTo(object obj)
+        {
+            ProjectNode that = (ProjectNode)obj;
+            return m_Name.CompareTo(that.m_Name);
+        }
 
 		#endregion
 	}

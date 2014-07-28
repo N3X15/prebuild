@@ -23,17 +23,8 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY O
 */
 #endregion
 
-#region CVS Information
-/*
- * $Source$
- * $Author: jendave $
- * $Date: 2006-01-27 16:49:58 -0800 (Fri, 27 Jan 2006) $
- * $Revision: 71 $
- */
-#endregion
-
 using System;
-using System.Collections;
+using System.Collections.Generic;
 
 namespace Prebuild.Core.Utilities
 {
@@ -44,19 +35,7 @@ namespace Prebuild.Core.Utilities
 	{
 		#region Fields
 
-		private Stack m_Stack;
-
-		#endregion
-
-		#region Constructors
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="CurrentDirectory"/> class.
-		/// </summary>
-		public CurrentDirectory()
-		{
-			m_Stack = new Stack();
-		}
+		private readonly Stack<string> m_Stack = new Stack<string>();
 
 		#endregion
 
@@ -80,7 +59,7 @@ namespace Prebuild.Core.Utilities
 				return;
 			}
             
-			string cwd = (string)m_Stack.Pop();
+			string cwd = m_Stack.Pop();
 			Helper.SetCurrentDir(cwd);
 		}
 

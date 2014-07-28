@@ -65,19 +65,8 @@ POSSIBILITY OF SUCH DAMAGE.
  */
 
 #endregion
-
-#region CVS Information
-/*
- * $Source$
- * $Author: jendave $
- * $Date: 2006-07-28 22:43:24 -0700 (Fri, 28 Jul 2006) $
- * $Revision: 136 $
- */
-#endregion
-
 using System;
-using System.Collections;
-using System.Collections.Specialized;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -90,7 +79,6 @@ using System.Diagnostics;
 using Prebuild.Core.Attributes;
 using Prebuild.Core.Interfaces;
 using Prebuild.Core.Nodes;
-using Prebuild.Core.Parse;
 using Prebuild.Core.Utilities;
 
 namespace Prebuild.Core.Targets
@@ -179,17 +167,16 @@ namespace Prebuild.Core.Targets
         XmlDocument autotoolsDoc;
         XmlUrlResolver xr;
         System.Security.Policy.Evidence e;
-        Hashtable assemblyPathToPackage = new Hashtable();
-        Hashtable assemblyFullNameToPath = new Hashtable();
-        Hashtable packagesHash = new Hashtable();
-        ArrayList packages = new ArrayList();
-        ClrVersion currentVersion;
+        readonly Dictionary<string, SystemPackage> assemblyPathToPackage = new Dictionary<string, SystemPackage>();
+        readonly Dictionary<string, string> assemblyFullNameToPath = new Dictionary<string, string>();
+        readonly Dictionary<string, SystemPackage> packagesHash = new Dictionary<string, SystemPackage>();
+        readonly List<SystemPackage> packages = new List<SystemPackage>();
 
         #endregion
 
         #region Private Methods
 
-        private void mkdirDashP(string dirName)
+        private static void mkdirDashP(string dirName)
         {
             DirectoryInfo di = new DirectoryInfo(dirName);
             if (di.Exists)
@@ -203,23 +190,7 @@ namespace Prebuild.Core.Targets
             di.Create();
         }
 
-        private void mkStubFiles(string dirName, ArrayList fileNames)
-        {
-            for (int i = 0; i < fileNames.Count; i++)
-            {
-                string tmpFile = dirName + "/" + (string)fileNames[i];
-
-                FileStream tmpFileStream =
-                    new FileStream(tmpFile, FileMode.Create);
-
-                StreamWriter sw = new StreamWriter(tmpFileStream);
-                sw.WriteLine("These are not the files you are looking for.");
-                sw.Flush();
-                tmpFileStream.Close();
-            }
-        }
-
-        private void chkMkDir(string dirName)
+        private static void chkMkDir(string dirName)
         {
             System.IO.DirectoryInfo di =
                 new System.IO.DirectoryInfo(dirName);
@@ -248,13 +219,12 @@ namespace Prebuild.Core.Targets
                 (m_Kernel.CurrentDoc, argList, templateWriter, xr);
         }
 
-        string NormalizeAsmName(string name)
+        static string NormalizeAsmName(string name)
         {
             int i = name.IndexOf(", PublicKeyToken=null");
             if (i != -1)
                 return name.Substring(0, i).Trim();
-            else
-                return name;
+            return name;
         }
 
         private void AddAssembly(string assemblyfile, SystemPackage package)
@@ -273,11 +243,11 @@ namespace Prebuild.Core.Targets
             }
         }
 
-        private ArrayList GetAssembliesWithLibInfo(string line, string file)
+        private static List<string> GetAssembliesWithLibInfo(string line, string file)
         {
-            ArrayList references = new ArrayList();
-            ArrayList libdirs = new ArrayList();
-            ArrayList retval = new ArrayList();
+            List<string> references = new List<string>();
+            List<string> libdirs = new List<string>();
+            List<string> retval = new List<string>();
             foreach (string piece in line.Split(' '))
             {
                 if (piece.ToLower().Trim().StartsWith("/r:") || piece.ToLower().Trim().StartsWith("-r:"))
@@ -304,9 +274,9 @@ namespace Prebuild.Core.Targets
             return retval;
         }
 
-        private ArrayList GetAssembliesWithoutLibInfo(string line, string file)
+        private static List<string> GetAssembliesWithoutLibInfo(string line, string file)
         {
-            ArrayList references = new ArrayList();
+            List<string> references = new List<string>();
             foreach (string reference in line.Split(' '))
             {
                 if (reference.ToLower().Trim().StartsWith("/r:") || reference.ToLower().Trim().StartsWith("-r:"))
@@ -318,7 +288,7 @@ namespace Prebuild.Core.Targets
             return references;
         }
 
-        private string ProcessPiece(string piece, string pcfile)
+        private static string ProcessPiece(string piece, string pcfile)
         {
             int start = piece.IndexOf("${");
             if (start == -1)
@@ -333,7 +303,7 @@ namespace Prebuild.Core.Targets
             return ProcessPiece(piece.Replace("${" + variable + "}", interp), pcfile);
         }
 
-        private string GetVariableFromPkgConfig(string var, string pcfile)
+        private static string GetVariableFromPkgConfig(string var, string pcfile)
         {
             ProcessStartInfo psi = new ProcessStartInfo("pkg-config");
             psi.RedirectStandardOutput = true;
@@ -353,10 +323,10 @@ namespace Prebuild.Core.Targets
         {
             // Don't register the package twice
             string pname = Path.GetFileNameWithoutExtension(pcfile);
-            if (packagesHash.Contains(pname))
+            if (packagesHash.ContainsKey(pname))
                 return;
 
-            ArrayList fullassemblies = null;
+            List<string> fullassemblies = null;
             string version = "";
             string desc = "";
 
@@ -404,7 +374,7 @@ namespace Prebuild.Core.Targets
             package.Initialize(pname,
                                version,
                                desc,
-                               (string[])fullassemblies.ToArray(typeof(string)),
+                               fullassemblies.ToArray(),
                                ClrVersion.Default,
                                false);
             packages.Add(package);
@@ -414,7 +384,7 @@ namespace Prebuild.Core.Targets
         void RegisterSystemAssemblies(string prefix, string version, ClrVersion ver)
         {
             SystemPackage package = new SystemPackage();
-            ArrayList list = new ArrayList();
+            List<string> list = new List<string>();
 
             string dir = Path.Combine(prefix, version);
             if (!Directory.Exists(dir))
@@ -431,7 +401,7 @@ namespace Prebuild.Core.Targets
             package.Initialize("mono",
                                version,
                                "The Mono runtime",
-                               (string[])list.ToArray(typeof(string)),
+                               list.ToArray(),
                                ver,
                                false);
             packages.Add(package);
@@ -444,12 +414,10 @@ namespace Prebuild.Core.Targets
             if (Environment.Version.Major == 1)
             {
                 versionDir = "1.0";
-                currentVersion = ClrVersion.Net_1_1;
             }
             else
             {
                 versionDir = "2.0";
-                currentVersion = ClrVersion.Net_2_0;
             }
 
             //Pull up assemblies from the installed mono system.
@@ -483,9 +451,9 @@ namespace Prebuild.Core.Targets
                 }
             }
             search_dirs += Path.PathSeparator + libpath;
-            if (search_dirs != null && search_dirs.Length > 0)
+            if (!string.IsNullOrEmpty(search_dirs))
             {
-                ArrayList scanDirs = new ArrayList();
+                List<string> scanDirs = new List<string>();
                 foreach (string potentialDir in search_dirs.Split(Path.PathSeparator))
                 {
                     if (!scanDirs.Contains(potentialDir))
@@ -534,158 +502,6 @@ namespace Prebuild.Core.Targets
                                                project.Name));
               WriteProject(solution, project);
             }
-        }
-        private static string PrependPath(string path)
-        {
-            string tmpPath = Helper.NormalizePath(path, '/');
-            Regex regex = new Regex(@"(\w):/(\w+)");
-            Match match = regex.Match(tmpPath);
-            if (match.Success || tmpPath[0] == '.' || tmpPath[0] == '/')
-            {
-                tmpPath = Helper.NormalizePath(tmpPath);
-            }
-            else
-            {
-                tmpPath = Helper.NormalizePath("./" + tmpPath);
-            }
-
-            return tmpPath;
-        }
-
-        private static string BuildReference(SolutionNode solution,
-                                             ReferenceNode refr)
-        {
-            string ret = "";
-            if (solution.ProjectsTable.ContainsKey(refr.Name))
-            {
-                ProjectNode project =
-                  (ProjectNode)solution.ProjectsTable[refr.Name];
-                string fileRef = FindFileReference(refr.Name, project);
-                string finalPath =
-                  Helper.NormalizePath(Helper.MakeFilePath(project.FullPath +
-                                                           "/$(BUILD_DIR)/$(CONFIG)/",
-                                                           refr.Name, "dll"),
-                                       '/');
-                ret += finalPath;
-                return ret;
-            }
-            else
-            {
-                ProjectNode project = (ProjectNode)refr.Parent;
-                string fileRef = FindFileReference(refr.Name, project);
-
-                if (refr.Path != null || fileRef != null)
-                {
-                  string finalPath = ((refr.Path != null) ?
-                                      Helper.NormalizePath(refr.Path + "/" +
-                                                           refr.Name + ".dll",
-                                                           '/') :
-                                      fileRef
-                                      );
-                    ret += Path.Combine(project.Path, finalPath);
-                    return ret;
-                }
-
-                try
-                {
-                    //Assembly assem = Assembly.Load(refr.Name);
-                    //if (assem != null)
-                    //{
-                    //    int index = refr.Name.IndexOf(",");
-                    //    if ( index > 0)
-                    //    {
-                    //        ret += assem.Location;
-                    //        //Console.WriteLine("Location1: " + assem.Location);
-                    //    }
-                    //    else
-                    //    {
-                    //        ret += (refr.Name + ".dll");
-                    //        //Console.WriteLine("Location2: " + assem.Location);
-                    //    }
-                    //}
-                    //else
-                    //{
-                    int index = refr.Name.IndexOf(",");
-                    if (index > 0)
-                    {
-                        ret += refr.Name.Substring(0, index) + ".dll";
-                        //Console.WriteLine("Location3: " + assem.Location);
-                    }
-                    else
-                    {
-                        ret += (refr.Name + ".dll");
-                        //Console.WriteLine("Location4: " + assem.Location);
-                    }
-                    //}
-                }
-                catch (System.NullReferenceException e)
-                {
-                    e.ToString();
-                    int index = refr.Name.IndexOf(",");
-                    if (index > 0)
-                    {
-                        ret += refr.Name.Substring(0, index) + ".dll";
-                        //Console.WriteLine("Location5: " + assem.Location);
-                    }
-                    else
-                    {
-                        ret += (refr.Name + ".dll");
-                        //Console.WriteLine("Location6: " + assem.Location);
-                    }
-                }
-            }
-            return ret;
-        }
-
-        private static string BuildReferencePath(SolutionNode solution,
-                                                 ReferenceNode refr)
-        {
-            string ret = "";
-            if (solution.ProjectsTable.ContainsKey(refr.Name))
-            {
-              ProjectNode project =
-                (ProjectNode)solution.ProjectsTable[refr.Name];
-              string finalPath =
-                Helper.NormalizePath(Helper.MakeReferencePath(project.FullPath +
-                                                              "/${build.dir}/"),
-                                     '/');
-              ret += finalPath;
-              return ret;
-            }
-            else
-            {
-              ProjectNode project = (ProjectNode)refr.Parent;
-              string fileRef = FindFileReference(refr.Name, project);
-
-              if (refr.Path != null || fileRef != null)
-                {
-                  string finalPath = ((refr.Path != null) ?
-                                      Helper.NormalizePath(refr.Path, '/') :
-                                      fileRef
-                                      );
-                  ret += finalPath;
-                  return ret;
-                }
-
-              try
-                {
-                  Assembly assem = Assembly.Load(refr.Name);
-                  if (assem != null)
-                    {
-                      ret += "";
-                    }
-                  else
-                    {
-                      ret += "";
-                    }
-                }
-              catch (System.NullReferenceException e)
-                {
-                  e.ToString();
-                  ret += "";
-                }
-            }
-            return ret;
         }
 
         private static string FindFileReference(string refName,
@@ -763,18 +579,18 @@ namespace Prebuild.Core.Targets
             bool hasAssemblyConfig = false;
             chkMkDir(projectDir);
 
-            ArrayList
-                compiledFiles = new ArrayList(),
-                contentFiles = new ArrayList(),
-                embeddedFiles = new ArrayList(),
+            List<string>
+                compiledFiles = new List<string>(),
+                contentFiles = new List<string>(),
+                embeddedFiles = new List<string>(),
 
-                binaryLibs = new ArrayList(),
-                pkgLibs = new ArrayList(),
-                systemLibs = new ArrayList(),
-                runtimeLibs = new ArrayList(),
+                binaryLibs = new List<string>(),
+                pkgLibs = new List<string>(),
+                systemLibs = new List<string>(),
+                runtimeLibs = new List<string>(),
 
-                extraDistFiles = new ArrayList(),
-                localCopyTargets = new ArrayList();
+                extraDistFiles = new List<string>(),
+                localCopyTargets = new List<string>();
 
             // If there exists a .config file for this assembly, copy
             // it to the project folder
@@ -859,7 +675,7 @@ namespace Prebuild.Core.Targets
                     }
                     catch 
                     {
-                        Console.WriteLine("Error! '{0}'", e.ToString());
+                        Console.WriteLine("Error! '{0}'", e);
                     }
                    
                 }
@@ -893,7 +709,7 @@ namespace Prebuild.Core.Targets
             // Set up references
             for (int refNum = 0; refNum < project.References.Count; refNum++)
             {
-                ReferenceNode refr = (ReferenceNode)project.References[refNum];
+                ReferenceNode refr = project.References[refNum];
                 Assembly refAssembly = Assembly.LoadWithPartialName(refr.Name);
 
                 /* Determine which pkg-config (.pc) file refers to
@@ -901,25 +717,28 @@ namespace Prebuild.Core.Targets
 
                 SystemPackage package = null;
 
-                if (packagesHash.Contains(refr.Name)){
-                  package = (SystemPackage)packagesHash[refr.Name];
+                if (packagesHash.ContainsKey(refr.Name))
+                {
+                  package = packagesHash[refr.Name];
 
-                }else{
-                  string assemblyFullName = string.Empty;
-                  if (refAssembly != null)
-                    assemblyFullName = refAssembly.FullName;
+                }
+                else
+                {
+                    string assemblyFullName = string.Empty;
+                    if (refAssembly != null)
+                        assemblyFullName = refAssembly.FullName;
 
-                  string assemblyFileName = string.Empty;
-                  if (assemblyFullName != string.Empty &&
-                      assemblyFullNameToPath.Contains(assemblyFullName)
-                      )
-                    assemblyFileName =
-                      (string)assemblyFullNameToPath[assemblyFullName];
+                    string assemblyFileName = string.Empty;
+                    if (assemblyFullName != string.Empty &&
+                        assemblyFullNameToPath.ContainsKey(assemblyFullName)
+                        )
+                        assemblyFileName =
+                          assemblyFullNameToPath[assemblyFullName];
 
-                  if (assemblyFileName != string.Empty &&
-                      assemblyPathToPackage.Contains(assemblyFileName)
-                      )
-                    package = (SystemPackage)assemblyPathToPackage[assemblyFileName];
+                    if (assemblyFileName != string.Empty &&
+                        assemblyPathToPackage.ContainsKey(assemblyFileName)
+                        )
+                        package = assemblyPathToPackage[assemblyFileName];
 
                 }
 
@@ -986,7 +805,7 @@ namespace Prebuild.Core.Targets
                          */
 
                         ProjectNode sourcePrj =
-                          ((ProjectNode)(solution.ProjectsTable[refr.Name]));
+                          ((solution.ProjectsTable[refr.Name]));
 
                         string target =
                           String.Format("{0}:\n" +
@@ -1019,46 +838,46 @@ namespace Prebuild.Core.Targets
                 }
             }
 
-            string lineSep = " \\\n\t";
+            const string lineSep = " \\\n\t";
             string compiledFilesString = string.Empty;
             if (compiledFiles.Count > 0)
                 compiledFilesString =
-                    lineSep + string.Join(lineSep, (string[])compiledFiles.ToArray(typeof(string)));
+                    lineSep + string.Join(lineSep, compiledFiles.ToArray());
 
             string embeddedFilesString = "";
             if (embeddedFiles.Count > 0)
                 embeddedFilesString =
-                    lineSep + string.Join(lineSep, (string[])embeddedFiles.ToArray(typeof(string)));
+                    lineSep + string.Join(lineSep, embeddedFiles.ToArray());
 
             string contentFilesString = "";
             if (contentFiles.Count > 0)
                 contentFilesString =
-                    lineSep + string.Join(lineSep, (string[])contentFiles.ToArray(typeof(string)));
+                    lineSep + string.Join(lineSep, contentFiles.ToArray());
 
             string extraDistFilesString = "";
             if (extraDistFiles.Count > 0)
                 extraDistFilesString =
-                    lineSep + string.Join(lineSep, (string[])extraDistFiles.ToArray(typeof(string)));
+                    lineSep + string.Join(lineSep, extraDistFiles.ToArray());
 
             string pkgLibsString = "";
             if (pkgLibs.Count > 0)
                 pkgLibsString =
-                    lineSep + string.Join(lineSep, (string[])pkgLibs.ToArray(typeof(string)));
+                    lineSep + string.Join(lineSep, pkgLibs.ToArray());
 
             string binaryLibsString = "";
             if (binaryLibs.Count > 0)
                 binaryLibsString =
-                    lineSep + string.Join(lineSep, (string[])binaryLibs.ToArray(typeof(string)));
+                    lineSep + string.Join(lineSep, binaryLibs.ToArray());
 
             string systemLibsString = "";
             if (systemLibs.Count > 0)
                 systemLibsString =
-                    lineSep + string.Join(lineSep, (string[])systemLibs.ToArray(typeof(string)));
+                    lineSep + string.Join(lineSep, systemLibs.ToArray());
 
             string localCopyTargetsString = "";
             if (localCopyTargets.Count > 0)
                 localCopyTargetsString =
-                    string.Join("\n", (string[])localCopyTargets.ToArray(typeof(string)));
+                    string.Join("\n", localCopyTargets.ToArray());
 
             string monoPath = "";
             foreach (string runtimeLib in runtimeLibs)
@@ -1093,564 +912,6 @@ namespace Prebuild.Core.Targets
                 transformToFile(Path.Combine(projectDir, project.Name + ".pc.in"), argList, "/Autotools/ProjectPcIn");
             if (project.Type == Core.Nodes.ProjectType.Exe || project.Type == Core.Nodes.ProjectType.WinExe)
                 transformToFile(Path.Combine(projectDir, project.Name.ToLower() + ".in"), argList, "/Autotools/ProjectWrapperScriptIn");
-        }
-
-        private void WriteProjectOld(SolutionNode solution, ProjectNode project)
-        {
-            string projFile = Helper.MakeFilePath(project.FullPath, "Include", "am");
-            StreamWriter ss = new StreamWriter(projFile);
-            ss.NewLine = "\n";
-
-            m_Kernel.CurrentWorkingDirectory.Push();
-            Helper.SetCurrentDir(Path.GetDirectoryName(projFile));
-
-            using (ss)
-            {
-                ss.WriteLine(Helper.AssemblyFullName(project.AssemblyName, project.Type) + ":");
-                ss.WriteLine("\tmkdir -p " + Helper.MakePathRelativeTo(solution.FullPath, project.Path) + "/$(BUILD_DIR)/$(CONFIG)/");
-                foreach (string file in project.Files)
-                {
-                    if (project.Files.GetSubType(file) != SubType.Code && project.Files.GetSubType(file) != SubType.Settings)
-                    {
-                        ss.Write("\tresgen ");
-                        ss.Write(Helper.NormalizePath(Path.Combine(project.Path, file.Substring(0, file.LastIndexOf('.')) + ".resx "), '/'));
-                        if (project.Files.GetResourceName(file) != "")
-                        {
-                            ss.WriteLine(Helper.NormalizePath(Path.Combine(project.Path, project.RootNamespace + "." + project.Files.GetResourceName(file) + ".resources"), '/'));
-                        }
-                        else
-                        {
-                            ss.WriteLine(Helper.NormalizePath(Path.Combine(project.Path, project.RootNamespace + "." + file.Substring(0, file.LastIndexOf('.')) + ".resources"), '/'));
-                        }
-                    }
-                }
-                ss.WriteLine("\t$(CSC)\t/out:" + Helper.MakePathRelativeTo(solution.FullPath, project.Path) + "/$(BUILD_DIR)/$(CONFIG)/" + Helper.AssemblyFullName(project.AssemblyName, project.Type) + " \\");
-                ss.WriteLine("\t\t/target:" + project.Type.ToString().ToLower() + " \\");
-                if (project.References.Count > 0)
-                {
-                    ss.Write("\t\t/reference:");
-                    bool firstref = true;
-                    foreach (ReferenceNode refr in project.References)
-                    {
-                        if (firstref)
-                        {
-                            firstref = false;
-                        }
-                        else
-                        {
-                            ss.Write(",");
-                        }
-                        ss.Write("{0}", Helper.NormalizePath(Helper.MakePathRelativeTo(solution.FullPath, BuildReference(solution, refr)), '/'));
-                    }
-                    ss.WriteLine(" \\");
-                }
-                //ss.WriteLine("\t\tProperties/AssemblyInfo.cs \\");
-
-                foreach (string file in project.Files)
-                {
-                    switch (project.Files.GetBuildAction(file))
-                    {
-                        case BuildAction.EmbeddedResource:
-                            ss.Write("\t\t/resource:");
-                            ss.WriteLine(Helper.NormalizePath(Path.Combine(project.Path, file), '/') + " \\");
-                            break;
-                        default:
-                            if (project.Files.GetSubType(file) != SubType.Code && project.Files.GetSubType(file) != SubType.Settings)
-                            {
-                                ss.Write("\t\t/resource:");
-                                if (project.Files.GetResourceName(file) != "")
-                                {
-                                    ss.WriteLine(Helper.NormalizePath(Path.Combine(project.Path, project.RootNamespace + "." + project.Files.GetResourceName(file) + ".resources"), '/') + "," + project.RootNamespace + "." + project.Files.GetResourceName(file) + ".resources" + " \\");
-                                }
-                                else
-                                {
-                                    ss.WriteLine(Helper.NormalizePath(Path.Combine(project.Path, project.RootNamespace + "." + file.Substring(0, file.LastIndexOf('.')) + ".resources"), '/') + "," + project.RootNamespace + "." + file.Substring(0, file.LastIndexOf('.')) + ".resources" + " \\");
-                                }
-                            }
-                            break;
-                    }
-                }
-
-                foreach (ConfigurationNode conf in project.Configurations)
-                {
-                    if (conf.Options.KeyFile != "")
-                    {
-                        ss.WriteLine("\t\t/keyfile:" + Helper.NormalizePath(Path.Combine(project.Path, conf.Options.KeyFile), '/') + " \\");
-                        break;
-                    }
-                }
-                foreach (ConfigurationNode conf in project.Configurations)
-                {
-                    if (conf.Options.AllowUnsafe)
-                    {
-                        ss.WriteLine("\t\t/unsafe \\");
-                        break;
-                    }
-                }
-                if (project.AppIcon != "")
-                {
-                    ss.WriteLine("\t\t/win32icon:" + Helper.NormalizePath(Path.Combine(project.Path, project.AppIcon), '/') + " \\");
-                }
-
-                foreach (ConfigurationNode conf in project.Configurations)
-                {
-                    ss.WriteLine("\t\t/define:{0}", conf.Options.CompilerDefines.Replace(';', ',') + " \\");
-                    break;
-                }
-
-                foreach (ConfigurationNode conf in project.Configurations)
-                {
-                    if (GetXmlDocFile(project, conf) != "")
-                    {
-                        ss.WriteLine("\t\t/doc:" + Helper.MakePathRelativeTo(solution.FullPath, project.Path) + "/$(BUILD_DIR)/$(CONFIG)/" + project.Name + ".xml \\");
-                        break;
-                    }
-                }
-                foreach (string file in project.Files)
-                {
-                    switch (project.Files.GetBuildAction(file))
-                    {
-                        case BuildAction.Compile:
-                            ss.WriteLine("\t\t\\");
-                            ss.Write("\t\t" + NormalizePath(Path.Combine(Helper.MakePathRelativeTo(solution.FullPath, project.Path), file)));
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                ss.WriteLine();
-                ss.WriteLine();
-
-                if (project.Type == ProjectType.Library)
-                {
-                    ss.WriteLine("install-data-local:");
-                    ss.WriteLine("	echo \"$(GACUTIL) /i bin/Release/" + project.Name + ".dll /f $(GACUTIL_FLAGS)\";  \\");
-                    ss.WriteLine("	$(GACUTIL) /i bin/Release/" + project.Name + ".dll /f $(GACUTIL_FLAGS) || exit 1;");
-                    ss.WriteLine();
-                    ss.WriteLine("uninstall-local:");
-                    ss.WriteLine("	echo \"$(GACUTIL) /u " + project.Name + " $(GACUTIL_FLAGS)\"; \\");
-                    ss.WriteLine("	$(GACUTIL) /u " + project.Name + " $(GACUTIL_FLAGS) || exit 1;");
-                    ss.WriteLine();
-                }
-                ss.WriteLine("CLEANFILES = $(BUILD_DIR)/$(CONFIG)/" + Helper.AssemblyFullName(project.AssemblyName, project.Type) + " $(BUILD_DIR)/$(CONFIG)/" + project.AssemblyName + ".mdb $(BUILD_DIR)/$(CONFIG)/" + project.AssemblyName + ".pdb " + project.AssemblyName + ".xml");
-                ss.WriteLine("EXTRA_DIST = \\");
-                ss.Write("	$(FILES)");
-                foreach (ConfigurationNode conf in project.Configurations)
-                {
-                    if (conf.Options.KeyFile != "")
-                    {
-                        ss.Write(" \\");
-                        ss.WriteLine("\t" + conf.Options.KeyFile);
-                    }
-                    break;
-                }
-            }
-            m_Kernel.CurrentWorkingDirectory.Pop();
-        }
-        bool hasLibrary = false;
-
-        private void WriteCombineOld(SolutionNode solution)
-        {
-
-            /* TODO: These vars should be pulled from the prebuild.xml file */
-            string releaseVersion = "2.0.0";
-            string assemblyVersion = "2.1.0.0";
-            string description =
-              "Tao Framework " + solution.Name + " Binding For .NET";
-
-            hasLibrary = false;
-            m_Kernel.Log.Write("Creating Autotools make files");
-            foreach (ProjectNode project in solution.Projects)
-            {
-                if (m_Kernel.AllowProject(project.FilterGroups))
-                {
-                    m_Kernel.Log.Write("...Creating makefile: {0}", project.Name);
-                    WriteProject(solution, project);
-                }
-            }
-
-            m_Kernel.Log.Write("");
-            string combFile = Helper.MakeFilePath(solution.FullPath, "Makefile", "am");
-            StreamWriter ss = new StreamWriter(combFile);
-            ss.NewLine = "\n";
-
-            m_Kernel.CurrentWorkingDirectory.Push();
-            Helper.SetCurrentDir(Path.GetDirectoryName(combFile));
-
-            using (ss)
-            {
-                foreach (ProjectNode project in solution.ProjectsTableOrder)
-                {
-                    if (project.Type == ProjectType.Library)
-                    {
-                        hasLibrary = true;
-                        break;
-                    }
-                }
-
-                if (hasLibrary)
-                {
-                    ss.Write("pkgconfig_in_files = ");
-                    foreach (ProjectNode project in solution.ProjectsTableOrder)
-                    {
-                        if (project.Type == ProjectType.Library)
-                        {
-                            string combFilepc = Helper.MakeFilePath(solution.FullPath, project.Name, "pc.in");
-                            ss.Write(" " + project.Name + ".pc.in ");
-                            StreamWriter sspc = new StreamWriter(combFilepc);
-                            sspc.NewLine = "\n";
-                            using (sspc)
-                            {
-                                sspc.WriteLine("prefix=@prefix@");
-                                sspc.WriteLine("exec_prefix=${prefix}");
-                                sspc.WriteLine("libdir=${exec_prefix}/lib");
-                                sspc.WriteLine();
-                                sspc.WriteLine("Name: @PACKAGE_NAME@");
-                                sspc.WriteLine("Description: @DESCRIPTION@");
-                                sspc.WriteLine("Version: @ASSEMBLY_VERSION@");
-                                sspc.WriteLine("Libs:  -r:${libdir}/mono/gac/@PACKAGE_NAME@/@ASSEMBLY_VERSION@__@PUBKEY@/@PACKAGE_NAME@.dll");
-                            }
-                        }
-                    }
-
-                    ss.WriteLine();
-                    ss.WriteLine("pkgconfigdir=$(prefix)/lib/pkgconfig");
-                    ss.WriteLine("pkgconfig_DATA=$(pkgconfig_in_files:.pc.in=.pc)");
-                }
-                ss.WriteLine();
-                foreach (ProjectNode project in solution.ProjectsTableOrder)
-                {
-                    string path = Helper.MakePathRelativeTo(solution.FullPath, project.FullPath);
-                    ss.WriteLine("-include x {0}",
-                        Helper.NormalizePath(Helper.MakeFilePath(path, "Include", "am"), '/'));
-                }
-                ss.WriteLine();
-                ss.WriteLine("all: \\");
-                ss.Write("\t");
-                foreach (ProjectNode project in solution.ProjectsTableOrder)
-                {
-                    string path = Helper.MakePathRelativeTo(solution.FullPath, project.FullPath);
-                    ss.Write(Helper.AssemblyFullName(project.AssemblyName, project.Type) + " ");
-
-                }
-                ss.WriteLine();
-                if (hasLibrary)
-                {
-                    ss.WriteLine("EXTRA_DIST = \\");
-                    ss.WriteLine("\t$(pkgconfig_in_files)");
-                }
-                else
-                {
-                    ss.WriteLine("EXTRA_DIST = ");
-                }
-                ss.WriteLine();
-                ss.WriteLine("DISTCLEANFILES = \\");
-                ss.WriteLine("\tconfigure \\");
-                ss.WriteLine("\tMakefile.in  \\");
-                ss.WriteLine("\taclocal.m4");
-            }
-            combFile = Helper.MakeFilePath(solution.FullPath, "configure", "ac");
-            StreamWriter ts = new StreamWriter(combFile);
-            ts.NewLine = "\n";
-            using (ts)
-            {
-                if (this.hasLibrary)
-                {
-                    foreach (ProjectNode project in solution.ProjectsTableOrder)
-                    {
-                        if (project.Type == ProjectType.Library)
-                        {
-                            ts.WriteLine("AC_INIT(" + project.Name + ".pc.in)");
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    ts.WriteLine("AC_INIT(Makefile.am)");
-                }
-                ts.WriteLine("AC_PREREQ(2.53)");
-                ts.WriteLine("AC_CANONICAL_SYSTEM");
-
-                ts.WriteLine("PACKAGE_NAME={0}", solution.Name);
-                ts.WriteLine("PACKAGE_VERSION={0}", releaseVersion);
-                ts.WriteLine("DESCRIPTION=\"{0}\"", description);
-                ts.WriteLine("AC_SUBST(DESCRIPTION)");
-                ts.WriteLine("AM_INIT_AUTOMAKE([$PACKAGE_NAME],[$PACKAGE_VERSION],[$DESCRIPTION])");
-
-                ts.WriteLine("ASSEMBLY_VERSION={0}", assemblyVersion);
-                ts.WriteLine("AC_SUBST(ASSEMBLY_VERSION)");
-
-                ts.WriteLine("PUBKEY=`sn -t $PACKAGE_NAME.snk | grep 'Public Key Token' | awk -F: '{print $2}' | sed -e 's/^ //'`");
-                ts.WriteLine("AC_SUBST(PUBKEY)");
-
-                ts.WriteLine();
-                ts.WriteLine("AM_MAINTAINER_MODE");
-                ts.WriteLine();
-                ts.WriteLine("dnl AC_PROG_INTLTOOL([0.25])");
-                ts.WriteLine();
-                ts.WriteLine("AC_PROG_INSTALL");
-                ts.WriteLine();
-                ts.WriteLine("MONO_REQUIRED_VERSION=1.1");
-                ts.WriteLine();
-                ts.WriteLine("AC_MSG_CHECKING([whether we're compiling from CVS])");
-                ts.WriteLine("if test -f \"$srcdir/.cvs_version\" ; then");
-                ts.WriteLine("        from_cvs=yes");
-                ts.WriteLine("else");
-                ts.WriteLine("  if test -f \"$srcdir/.svn\" ; then");
-                ts.WriteLine("        from_cvs=yes");
-                ts.WriteLine("  else");
-                ts.WriteLine("        from_cvs=no");
-                ts.WriteLine("  fi");
-                ts.WriteLine("fi");
-                ts.WriteLine();
-                ts.WriteLine("AC_MSG_RESULT($from_cvs)");
-                ts.WriteLine();
-                ts.WriteLine("AC_PATH_PROG(MONO, mono)");
-                ts.WriteLine("AC_PATH_PROG(GMCS, gmcs)");
-                ts.WriteLine("AC_PATH_PROG(GACUTIL, gacutil)");
-                ts.WriteLine();
-                ts.WriteLine("AC_MSG_CHECKING([for mono])");
-                ts.WriteLine("dnl if test \"x$MONO\" = \"x\" ; then");
-                ts.WriteLine("dnl  AC_MSG_ERROR([Can't find \"mono\" in your PATH])");
-                ts.WriteLine("dnl else");
-                ts.WriteLine("  AC_MSG_RESULT([found])");
-                ts.WriteLine("dnl fi");
-                ts.WriteLine();
-                ts.WriteLine("AC_MSG_CHECKING([for gmcs])");
-                ts.WriteLine("dnl if test \"x$GMCS\" = \"x\" ; then");
-                ts.WriteLine("dnl  AC_MSG_ERROR([Can't find \"gmcs\" in your PATH])");
-                ts.WriteLine("dnl else");
-                ts.WriteLine("  AC_MSG_RESULT([found])");
-                ts.WriteLine("dnl fi");
-                ts.WriteLine();
-                //ts.WriteLine("AC_MSG_CHECKING([for gacutil])");
-                //ts.WriteLine("if test \"x$GACUTIL\" = \"x\" ; then");
-                //ts.WriteLine("  AC_MSG_ERROR([Can't find \"gacutil\" in your PATH])");
-                //ts.WriteLine("else");
-                //ts.WriteLine("  AC_MSG_RESULT([found])");
-                //ts.WriteLine("fi");
-                ts.WriteLine();
-                ts.WriteLine("AC_SUBST(PATH)");
-                ts.WriteLine("AC_SUBST(LD_LIBRARY_PATH)");
-                ts.WriteLine();
-                ts.WriteLine("dnl CSFLAGS=\"-debug -nowarn:1574\"");
-                ts.WriteLine("CSFLAGS=\"\"");
-                ts.WriteLine("AC_SUBST(CSFLAGS)");
-                ts.WriteLine();
-                //				ts.WriteLine("AC_MSG_CHECKING(--disable-sdl argument)");
-                //				ts.WriteLine("AC_ARG_ENABLE(sdl,");
-                //				ts.WriteLine("    [  --disable-sdl         Disable Sdl interface.],");
-                //				ts.WriteLine("    [disable_sdl=$disableval],");
-                //				ts.WriteLine("    [disable_sdl=\"no\"])");
-                //				ts.WriteLine("AC_MSG_RESULT($disable_sdl)");
-                //				ts.WriteLine("if test \"$disable_sdl\" = \"yes\"; then");
-                //				ts.WriteLine("  AC_DEFINE(FEAT_SDL)");
-                //				ts.WriteLine("fi");
-                ts.WriteLine();
-                ts.WriteLine("dnl Find pkg-config");
-                ts.WriteLine("AC_PATH_PROG(PKGCONFIG, pkg-config, no)");
-                ts.WriteLine("if test \"x$PKG_CONFIG\" = \"xno\"; then");
-                ts.WriteLine("        AC_MSG_ERROR([You need to install pkg-config])");
-                ts.WriteLine("fi");
-                ts.WriteLine();
-                ts.WriteLine("PKG_CHECK_MODULES(MONO_DEPENDENCY, mono >= $MONO_REQUIRED_VERSION, has_mono=true, has_mono=false)");
-                ts.WriteLine("BUILD_DIR=\"bin\"");
-                ts.WriteLine("AC_SUBST(BUILD_DIR)");
-                ts.WriteLine("CONFIG=\"Release\"");
-                ts.WriteLine("AC_SUBST(CONFIG)");
-                ts.WriteLine();
-                ts.WriteLine("if test \"x$has_mono\" = \"xtrue\"; then");
-                ts.WriteLine("  AC_PATH_PROG(RUNTIME, mono, no)");
-                ts.WriteLine("  AC_PATH_PROG(CSC, gmcs, no)");
-                ts.WriteLine("  if test `uname -s` = \"Darwin\"; then");
-                ts.WriteLine("        LIB_PREFIX=");
-                ts.WriteLine("        LIB_SUFFIX=.dylib");
-                ts.WriteLine("  else");
-                ts.WriteLine("        LIB_PREFIX=.so");
-                ts.WriteLine("        LIB_SUFFIX=");
-                ts.WriteLine("  fi");
-                ts.WriteLine("else");
-                ts.WriteLine("  AC_PATH_PROG(CSC, csc.exe, no)");
-                ts.WriteLine("  if test x$CSC = \"xno\"; then");
-                ts.WriteLine("        AC_MSG_ERROR([You need to install either mono or .Net])");
-                ts.WriteLine("  else");
-                ts.WriteLine("    RUNTIME=");
-                ts.WriteLine("    LIB_PREFIX=");
-                ts.WriteLine("    LIB_SUFFIX=.dylib");
-                ts.WriteLine("  fi");
-                ts.WriteLine("fi");
-                ts.WriteLine();
-                ts.WriteLine("AC_SUBST(LIB_PREFIX)");
-                ts.WriteLine("AC_SUBST(LIB_SUFFIX)");
-                ts.WriteLine();
-                ts.WriteLine("AC_SUBST(BASE_DEPENDENCIES_CFLAGS)");
-                ts.WriteLine("AC_SUBST(BASE_DEPENDENCIES_LIBS)");
-                ts.WriteLine();
-                ts.WriteLine("dnl Find monodoc");
-                ts.WriteLine("MONODOC_REQUIRED_VERSION=1.0");
-                ts.WriteLine("AC_SUBST(MONODOC_REQUIRED_VERSION)");
-                ts.WriteLine("PKG_CHECK_MODULES(MONODOC_DEPENDENCY, monodoc >= $MONODOC_REQUIRED_VERSION, enable_monodoc=yes, enable_monodoc=no)");
-                ts.WriteLine();
-                ts.WriteLine("if test \"x$enable_monodoc\" = \"xyes\"; then");
-                ts.WriteLine("        AC_PATH_PROG(MONODOC, monodoc, no)");
-                ts.WriteLine("        if test x$MONODOC = xno; then");
-                ts.WriteLine("           enable_monodoc=no");
-                ts.WriteLine("        fi");
-                ts.WriteLine("else");
-                ts.WriteLine("        MONODOC=");
-                ts.WriteLine("fi");
-                ts.WriteLine();
-                ts.WriteLine("AC_SUBST(MONODOC)");
-                ts.WriteLine("AM_CONDITIONAL(ENABLE_MONODOC, test \"x$enable_monodoc\" = \"xyes\")");
-                ts.WriteLine();
-                ts.WriteLine("AC_PATH_PROG(GACUTIL, gacutil, no)");
-                ts.WriteLine("if test \"x$GACUTIL\" = \"xno\" ; then");
-                ts.WriteLine("        AC_MSG_ERROR([No gacutil tool found])");
-                ts.WriteLine("fi");
-                ts.WriteLine();
-                //				foreach(ProjectNode project in solution.ProjectsTableOrder)
-                //				{
-                //					if (project.Type == ProjectType.Library)
-                //					{
-                //					}
-                //				}
-                ts.WriteLine("GACUTIL_FLAGS='/package $(PACKAGE_NAME) /gacdir $(DESTDIR)$(prefix)'");
-                ts.WriteLine("AC_SUBST(GACUTIL_FLAGS)");
-                ts.WriteLine();
-                ts.WriteLine("winbuild=no");
-                ts.WriteLine("case \"$host\" in");
-                ts.WriteLine("       *-*-mingw*|*-*-cygwin*)");
-                ts.WriteLine("               winbuild=yes");
-                ts.WriteLine("               ;;");
-                ts.WriteLine("esac");
-                ts.WriteLine("AM_CONDITIONAL(WINBUILD, test x$winbuild = xyes)");
-                ts.WriteLine();
-                //				ts.WriteLine("dnl Check for SDL");
-                //				ts.WriteLine();
-                //				ts.WriteLine("AC_PATH_PROG([SDL_CONFIG], [sdl-config])");
-                //				ts.WriteLine("have_sdl=no");
-                //				ts.WriteLine("if test -n \"${SDL_CONFIG}\"; then");
-                //				ts.WriteLine("    have_sdl=yes");
-                //				ts.WriteLine("    SDL_CFLAGS=`$SDL_CONFIG --cflags`");
-                //				ts.WriteLine("    SDL_LIBS=`$SDL_CONFIG --libs`");
-                //				ts.WriteLine("    #");
-                //				ts.WriteLine("    # sdl-config sometimes emits an rpath flag pointing at its library");
-                //				ts.WriteLine("    # installation directory.  We don't want this, as it prevents users from");
-                //				ts.WriteLine("    # linking sdl-viewer against, for example, a locally compiled libGL when a");
-                //				ts.WriteLine("    # version of the library also exists in SDL's library installation");
-                //				ts.WriteLine("    # directory, typically /usr/lib.");
-                //				ts.WriteLine("    #");
-                //				ts.WriteLine("    SDL_LIBS=`echo $SDL_LIBS | sed 's/-Wl,-rpath,[[^ ]]* //'`");
-                //				ts.WriteLine("fi");
-                //				ts.WriteLine("AC_SUBST([SDL_CFLAGS])");
-                //				ts.WriteLine("AC_SUBST([SDL_LIBS])");
-                ts.WriteLine();
-                ts.WriteLine("AC_OUTPUT([");
-                ts.WriteLine("Makefile");
-                // TODO: this does not work quite right.
-                //ts.WriteLine("Properties/AssemblyInfo.cs");
-                foreach (ProjectNode project in solution.ProjectsTableOrder)
-                {
-                    if (project.Type == ProjectType.Library)
-                    {
-                        ts.WriteLine(project.Name + ".pc");
-                    }
-                    //					string path = Helper.MakePathRelativeTo(solution.FullPath, project.FullPath);
-                    //					ts.WriteLine(Helper.NormalizePath(Helper.MakeFilePath(path, "Include"),'/'));
-                }
-                ts.WriteLine("])");
-                ts.WriteLine();
-                ts.WriteLine("#po/Makefile.in");
-                ts.WriteLine();
-                ts.WriteLine("echo \"---\"");
-                ts.WriteLine("echo \"Configuration summary\"");
-                ts.WriteLine("echo \"\"");
-                ts.WriteLine("echo \"   * Installation prefix: $prefix\"");
-                ts.WriteLine("echo \"   * compiler:            $CSC\"");
-                ts.WriteLine("echo \"   * Documentation:       $enable_monodoc ($MONODOC)\"");
-                ts.WriteLine("echo \"   * Package Name:        $PACKAGE_NAME\"");
-                ts.WriteLine("echo \"   * Version:             $PACKAGE_VERSION\"");
-                ts.WriteLine("echo \"   * Public Key:          $PUBKEY\"");
-                ts.WriteLine("echo \"\"");
-                ts.WriteLine("echo \"---\"");
-                ts.WriteLine();
-            }
-
-            ts.NewLine = "\n";
-            foreach (ProjectNode project in solution.ProjectsTableOrder)
-            {
-                if (project.GenerateAssemblyInfoFile)
-                {
-                    GenerateAssemblyInfoFile(solution, combFile);
-                }
-            }
-        }
-
-        private static void GenerateAssemblyInfoFile(SolutionNode solution, string combFile)
-        {
-            System.IO.Directory.CreateDirectory(Helper.MakePathRelativeTo(solution.FullPath, "Properties"));
-            combFile = Helper.MakeFilePath(solution.FullPath + "/Properties/", "AssemblyInfo.cs", "in");
-            StreamWriter ai = new StreamWriter(combFile);
-
-            using (ai)
-            {
-                ai.WriteLine("#region License");
-                ai.WriteLine("/*");
-                ai.WriteLine("MIT License");
-                ai.WriteLine("Copyright (c)2003-2006 Tao Framework Team");
-                ai.WriteLine("http://www.taoframework.com");
-                ai.WriteLine("All rights reserved.");
-                ai.WriteLine("");
-                ai.WriteLine("Permission is hereby granted, free of charge, to any person obtaining a copy");
-                ai.WriteLine("of this software and associated documentation files (the \"Software\"), to deal");
-                ai.WriteLine("in the Software without restriction, including without limitation the rights");
-                ai.WriteLine("to use, copy, modify, merge, publish, distribute, sublicense, and/or sell");
-                ai.WriteLine("copies of the Software, and to permit persons to whom the Software is");
-                ai.WriteLine("furnished to do so, subject to the following conditions:");
-                ai.WriteLine("");
-                ai.WriteLine("The above copyright notice and this permission notice shall be included in all");
-                ai.WriteLine("copies or substantial portions of the Software.");
-                ai.WriteLine("");
-                ai.WriteLine("THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR");
-                ai.WriteLine("IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,");
-                ai.WriteLine("FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE");
-                ai.WriteLine("AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER");
-                ai.WriteLine("LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,");
-                ai.WriteLine("OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE");
-                ai.WriteLine("SOFTWARE.");
-                ai.WriteLine("*/");
-                ai.WriteLine("#endregion License");
-                ai.WriteLine("");
-                ai.WriteLine("using System;");
-                ai.WriteLine("using System.Reflection;");
-                ai.WriteLine("using System.Runtime.InteropServices;");
-                ai.WriteLine("using System.Security;");
-                ai.WriteLine("using System.Security.Permissions;");
-                ai.WriteLine("");
-                ai.WriteLine("[assembly: AllowPartiallyTrustedCallers]");
-                ai.WriteLine("[assembly: AssemblyCompany(\"Tao Framework -- http://www.taoframework.com\")]");
-                ai.WriteLine("[assembly: AssemblyConfiguration(\"Retail\")]");
-                ai.WriteLine("[assembly: AssemblyCopyright(\"Copyright (c)2003-2006 Tao Framework Team.  All rights reserved.\")]");
-                ai.WriteLine("[assembly: AssemblyCulture(\"\")]");
-                ai.WriteLine("[assembly: AssemblyDefaultAlias(\"@PACKAGE_NAME@\")]");
-                ai.WriteLine("[assembly: AssemblyDelaySign(false)]");
-                ai.WriteLine("[assembly: AssemblyDescription(\"@DESCRIPTION@\")]");
-                ai.WriteLine("[assembly: AssemblyFileVersion(\"@ASSEMBLY_VERSION@\")]");
-                ai.WriteLine("[assembly: AssemblyInformationalVersion(\"@ASSEMBLY_VERSION@\")]");
-                ai.WriteLine("[assembly: AssemblyKeyName(\"\")]");
-                ai.WriteLine("[assembly: AssemblyProduct(\"@PACKAGE_NAME@.dll\")]");
-                ai.WriteLine("[assembly: AssemblyTitle(\"@DESCRIPTION@\")]");
-                ai.WriteLine("[assembly: AssemblyTrademark(\"Tao Framework -- http://www.taoframework.com\")]");
-                ai.WriteLine("[assembly: AssemblyVersion(\"@ASSEMBLY_VERSION@\")]");
-                ai.WriteLine("[assembly: CLSCompliant(true)]");
-                ai.WriteLine("[assembly: ComVisible(false)]");
-                ai.WriteLine("[assembly: SecurityPermission(SecurityAction.RequestMinimum, Flags = SecurityPermissionFlag.Execution)]");
-                ai.WriteLine("[assembly: SecurityPermission(SecurityAction.RequestMinimum, Flags = SecurityPermissionFlag.SkipVerification)]");
-                ai.WriteLine("[assembly: SecurityPermission(SecurityAction.RequestMinimum, Flags = SecurityPermissionFlag.UnmanagedCode)]");
-
-            }
-            //return combFile;
         }
 
         private void CleanProject(ProjectNode project)
@@ -1705,7 +966,7 @@ namespace Prebuild.Core.Targets
             m_Kernel.Log.Write("Parsing system pkg-config files");
             RunInitialization();
 
-            string streamName = "autotools.xml";
+            const string streamName = "autotools.xml";
             string fqStreamName = String.Format("Prebuild.data.{0}",
                                                 streamName
                                                 );
@@ -1755,10 +1016,9 @@ namespace Prebuild.Core.Targets
 
             string pwd = Directory.GetCurrentDirectory();
             //string pwd = System.Environment.GetEnvironmentVariable("PWD");
-            string rootDir = "";
             //if (pwd.Length != 0)
             //{
-            rootDir = Path.Combine(pwd, "autotools");
+            string rootDir = Path.Combine(pwd, "autotools");
             //}
             //else
             //{

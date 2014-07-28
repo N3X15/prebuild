@@ -23,18 +23,7 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY O
 */
 #endregion
 
-#region CVS Information
-/*
- * $Source$
- * $Author: sontek $
- * $Date: 2008-05-07 13:59:35 -0700 (Wed, 07 May 2008) $
- * $Revision: 270 $
- */
-#endregion
-
 using System;
-using System.Collections;
-using System.Collections.Specialized;
 using System.IO;
 using System.Text;
 
@@ -65,9 +54,15 @@ namespace Prebuild.Core.Targets
 
         VSVersion version = VSVersion.VS80;
 
-        Hashtable tools;
-        Kernel kernel;
+        public override string SolutionTag
+        {
+            get { return "# Visual Studio 2005"; }
+        }
 
+        protected override string GetToolsVersionXml(FrameworkVersion frameworkVersion)
+        {
+            return string.Empty;
+        }
         /// <summary>
         /// Gets or sets the solution version.
         /// </summary>
@@ -134,6 +129,7 @@ namespace Prebuild.Core.Targets
                 return name;
             }
         }
+
         #endregion
 
         #region Constructors

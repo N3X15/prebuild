@@ -23,20 +23,8 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY O
 */
 #endregion
 
-#region CVS Information
-/*
- * $Source$
- * $Author: jendave $
- * $Date: 2007-01-08 08:55:40 -0800 (Mon, 08 Jan 2007) $
- * $Revision: 197 $
- */
-#endregion
-
-
-
 using System;
-using System.Collections;
-using System.Collections.Specialized;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Xml;
 
@@ -54,7 +42,7 @@ namespace Prebuild.Core.Nodes
 	{
 		#region Fields
 
-		private static Hashtable m_OptionFields;
+		private static readonly Dictionary<string,FieldInfo> m_OptionFields = new Dictionary<string, FieldInfo>();
 
 		[OptionNode("CompilerDefines")]
 		private string m_CompilerDefines = "";
@@ -506,25 +494,7 @@ namespace Prebuild.Core.Nodes
 			}
 		}
 
-        [OptionNode("PlatformTarget")]
-        private string m_PlatformTarget = "Any CPU";
-
-        /// <summary>
-        /// 
-        /// </summary>
-        public string PlatformTarget
-        {
-            get
-            {
-                return m_PlatformTarget;
-            }
-            set
-            {
-                m_PlatformTarget = value;
-            }
-        }
-
-		private StringCollection m_FieldsDefined;
+		private readonly List<string> m_FieldsDefined = new List<string>();
 
 		#endregion
 
@@ -537,7 +507,6 @@ namespace Prebuild.Core.Nodes
 		{
 			Type t = typeof(OptionsNode);
             
-			m_OptionFields = new Hashtable();
 			foreach(FieldInfo f in t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
 			{
 				object[] attrs = f.GetCustomAttributes(typeof(OptionNodeAttribute), false);
@@ -549,14 +518,6 @@ namespace Prebuild.Core.Nodes
 				OptionNodeAttribute ona = (OptionNodeAttribute)attrs[0];
 				m_OptionFields[ona.NodeName] = f;
 			}
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="OptionsNode"/> class.
-		/// </summary>
-		public OptionsNode()
-		{
-			m_FieldsDefined = new StringCollection();
 		}
 
 		#endregion
@@ -576,7 +537,7 @@ namespace Prebuild.Core.Nodes
 					return null;
 				}
 
-				FieldInfo f = (FieldInfo)m_OptionFields[index];
+				FieldInfo f = m_OptionFields[index];
 				return f.GetValue(this);
 			}
 		}
@@ -620,7 +581,7 @@ namespace Prebuild.Core.Nodes
 					return;
 				}
 
-				FieldInfo f = (FieldInfo)m_OptionFields[nodeName];
+				FieldInfo f = m_OptionFields[nodeName];
 				f.SetValue(this, Helper.TranslateValue(f.FieldType, val));
 				FlagDefined(f.Name);
 			}

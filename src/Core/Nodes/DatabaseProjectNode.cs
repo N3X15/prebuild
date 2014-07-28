@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using System.Xml;
 
@@ -16,53 +16,53 @@ namespace Prebuild.Core.Nodes
         string path;
         string fullpath;
         Guid guid = Guid.NewGuid();
-        ArrayList authors = new ArrayList();
-        ArrayList references = new ArrayList();
+        readonly List<AuthorNode> authors = new List<AuthorNode>();
+        readonly List<DatabaseReferenceNode> references = new List<DatabaseReferenceNode>();
 
         public Guid Guid
         {
-            get { return this.guid; }
+            get { return guid; }
         }
 
         public string Name
         {
-            get { return this.name; }
+            get { return name; }
         }
 
         public string Path
         {
-            get { return this.path; }
+            get { return path; }
         }
 
         public string FullPath
         {
-            get { return this.fullpath; }
+            get { return fullpath; }
         }
 
-        public IEnumerable References
+        public IEnumerable<DatabaseReferenceNode> References
         {
-            get { return this.references; }
+            get { return references; }
         }
 
-        public override void Parse(System.Xml.XmlNode node)
+        public override void Parse(XmlNode node)
         {
-            this.name = Helper.AttributeValue(node, "name", this.name);
-            this.path = Helper.AttributeValue(node, "path", this.name);
+            name = Helper.AttributeValue(node, "name", name);
+            path = Helper.AttributeValue(node, "path", name);
 
             try
             {
-                this.fullpath = Helper.ResolvePath(this.path);
+                fullpath = Helper.ResolvePath(path);
             }
             catch
             {
-                throw new WarningException("Could not resolve Solution path: {0}", this.path);
+                throw new WarningException("Could not resolve Solution path: {0}", path);
             }
 
             Kernel.Instance.CurrentWorkingDirectory.Push();
 
             try
             {
-                Helper.SetCurrentDir(this.fullpath);
+                Helper.SetCurrentDir(fullpath);
 
                 if (node == null)
                 {
@@ -77,9 +77,9 @@ namespace Prebuild.Core.Nodes
                         continue;
 
                     if (dataNode is AuthorNode)
-                        this.authors.Add(dataNode);
+                        authors.Add((AuthorNode)dataNode);
                     else if (dataNode is DatabaseReferenceNode)
-                        this.references.Add(dataNode);
+                        references.Add((DatabaseReferenceNode)dataNode);
                 }
             }
             finally

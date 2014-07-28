@@ -38,15 +38,6 @@ POSSIBILITY OF SUCH DAMAGE.
 */
 #endregion
 
-#region CVS Information
-/*
- * $Source$
- * $Author: cjcollier $
- * $Date: 2008-02-07 08:31:29 -0800 (Thu, 07 Feb 2008) $
- * $Revision: 256 $
- */
-#endregion
-
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -70,16 +61,17 @@ using System.Resources;
 [assembly: AssemblyConfiguration(".NET CLR")]
 [assembly: AssemblyCompany("The Prebuild Project")]
 [assembly: AssemblyProduct("")]
-[assembly: AssemblyCopyright("Copyright 2004-2008 " +
+[assembly: AssemblyCopyright("Copyright 2004-2013 " +
                              "Matthew Holmes, " +
                              "Dan Moorehead, " +
                              "C.J. Adams-Collier, " +
                              "Rob Loach, " +
-                             "David Hudson,")]
+                             "David Hudson," +
+                             "John Hurliman")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: NeutralResourcesLanguageAttribute("en-US")]
-[assembly: AssemblyVersion("2.0.3.*")]
+[assembly: AssemblyVersion("2.0.6.*")]
 
 //
 // Version information for an assembly consists of the following four values:

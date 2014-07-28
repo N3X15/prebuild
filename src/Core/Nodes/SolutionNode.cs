@@ -23,19 +23,9 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY O
 */
 #endregion
 
-#region CVS Information
-/*
- * $Source$
- * $Author: sontek $
- * $Date: 2008-04-30 16:36:53 -0700 (Wed, 30 Apr 2008) $
- * $Revision: 267 $
- */
-#endregion
-
 using System;
-using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Xml;
 
 using Prebuild.Core.Attributes;
@@ -58,33 +48,19 @@ namespace Prebuild.Core.Nodes
 		private string m_Name = "unknown";
 		private string m_Path = "";
 		private string m_FullPath = "";
-		private string m_ActiveConfig = "Debug";
+		private string m_ActiveConfig;
+        private string m_Version = "1.0.0";
         
 		private OptionsNode m_Options;
 		private FilesNode m_Files;
-		private Hashtable m_Configurations;
-		private Hashtable m_Projects;
-        private Hashtable m_DatabaseProjects;
-		private ArrayList m_ProjectsOrder;
-        private Hashtable m_Solutions;
+        private readonly ConfigurationNodeCollection m_Configurations = new ConfigurationNodeCollection();
+        private readonly Dictionary<string, ProjectNode> m_Projects = new Dictionary<string, ProjectNode>();
+        private readonly Dictionary<string, DatabaseProjectNode> m_DatabaseProjects = new Dictionary<string, DatabaseProjectNode>();
+        private readonly List<ProjectNode> m_ProjectsOrder = new List<ProjectNode>();
+        private readonly Dictionary<string, SolutionNode> m_Solutions = new Dictionary<string, SolutionNode>();
+	    private CleanupNode m_Cleanup;
 
-		#endregion
-
-		#region Constructors
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="SolutionNode"/> class.
-		/// </summary>
-		public SolutionNode()
-		{
-			m_Configurations = new Hashtable();
-			m_Projects = new Hashtable();
-			m_ProjectsOrder = new ArrayList();
-            m_DatabaseProjects = new Hashtable();
-            m_Solutions = new Hashtable();
-		}
-
-		#endregion
+	    #endregion
 
 		#region Properties
         public override IDataNode Parent
@@ -100,13 +76,25 @@ namespace Prebuild.Core.Nodes
                     SolutionNode solution = (SolutionNode)value;
                     foreach (ConfigurationNode conf in solution.Configurations)
                     {
-                        m_Configurations[conf.Name] = conf.Clone();
+                        m_Configurations[conf.Name] = (ConfigurationNode) conf.Clone();
                     }
                 }
 
                 base.Parent = value;
             }
         }
+
+	    public CleanupNode Cleanup
+	    {
+	        get
+	        {
+	            return m_Cleanup;
+	        }
+            set
+            {
+                m_Cleanup = value;
+            }
+	    }
 
         public Guid Guid
         {
@@ -172,6 +160,18 @@ namespace Prebuild.Core.Nodes
 		}
 
 		/// <summary>
+		/// Gets the version.
+		/// </summary>
+		/// <value>The version.</value>
+		public string Version 
+		{
+			get 
+			{
+				return m_Version;
+			}
+		}
+
+		/// <summary>
 		/// Gets the options.
 		/// </summary>
 		/// <value>The options.</value>
@@ -199,11 +199,13 @@ namespace Prebuild.Core.Nodes
 		/// Gets the configurations.
 		/// </summary>
 		/// <value>The configurations.</value>
-		public ICollection Configurations
+		public ConfigurationNodeCollection Configurations
 		{
 			get
 			{
-				return m_Configurations.Values;
+				ConfigurationNodeCollection tmp = new ConfigurationNodeCollection();
+				tmp.AddRange(ConfigurationsTable);
+				return tmp;
 			}
 		}
 
@@ -211,7 +213,7 @@ namespace Prebuild.Core.Nodes
 		/// Gets the configurations table.
 		/// </summary>
 		/// <value>The configurations table.</value>
-		public Hashtable ConfigurationsTable
+		public ConfigurationNodeCollection ConfigurationsTable
 		{
 			get
 			{
@@ -221,7 +223,7 @@ namespace Prebuild.Core.Nodes
         /// <summary>
         /// Gets the database projects.
         /// </summary>
-        public ICollection DatabaseProjects
+        public ICollection<DatabaseProjectNode> DatabaseProjects
         {
             get
             {
@@ -231,7 +233,7 @@ namespace Prebuild.Core.Nodes
         /// <summary>
         /// Gets the nested solutions.
         /// </summary>
-        public ICollection Solutions
+        public ICollection<SolutionNode> Solutions
         {
             get
             {
@@ -241,22 +243,24 @@ namespace Prebuild.Core.Nodes
         /// <summary>
         /// Gets the nested solutions hash table.
         /// </summary>
-        public Hashtable SolutionsTable
+        public Dictionary<string, SolutionNode> SolutionsTable
         {
             get
             {
-                return this.m_Solutions;
+                return m_Solutions;
             }
         }
 		/// <summary>
 		/// Gets the projects.
 		/// </summary>
 		/// <value>The projects.</value>
-		public ICollection Projects
+		public ICollection<ProjectNode> Projects
 		{
 			get
 			{
-				return m_Projects.Values;
+                List<ProjectNode> tmp = new List<ProjectNode>(m_Projects.Values);
+                tmp.Sort();
+                return tmp;
 			}
 		}
 
@@ -264,7 +268,7 @@ namespace Prebuild.Core.Nodes
 		/// Gets the projects table.
 		/// </summary>
 		/// <value>The projects table.</value>
-		public Hashtable ProjectsTable
+		public Dictionary<string, ProjectNode> ProjectsTable
 		{
 			get
 			{
@@ -276,7 +280,7 @@ namespace Prebuild.Core.Nodes
 		/// Gets the projects table.
 		/// </summary>
 		/// <value>The projects table.</value>
-		public ArrayList ProjectsTableOrder
+		public List<ProjectNode> ProjectsTableOrder
 		{
 			get
 			{
@@ -297,6 +301,7 @@ namespace Prebuild.Core.Nodes
 			m_Name = Helper.AttributeValue(node, "name", m_Name);
 			m_ActiveConfig = Helper.AttributeValue(node, "activeConfig", m_ActiveConfig);
 			m_Path = Helper.AttributeValue(node, "path", m_Path);
+			m_Version = Helper.AttributeValue(node, "version", m_Version);
 
 			m_FullPath = m_Path;
 			try
@@ -331,16 +336,23 @@ namespace Prebuild.Core.Nodes
 					}
 					else if(dataNode is ConfigurationNode)
 					{
-						m_Configurations[((ConfigurationNode)dataNode).Name] = dataNode;
+						ConfigurationNode configurationNode = (ConfigurationNode) dataNode;
+						m_Configurations[configurationNode.NameAndPlatform] = configurationNode;
+
+						// If the active configuration is null, then we populate it.
+						if (ActiveConfig == null)
+						{
+							ActiveConfig = configurationNode.Name;
+						}
 					}
 					else if(dataNode is ProjectNode)
 					{
-						m_Projects[((ProjectNode)dataNode).Name] = dataNode;
-						m_ProjectsOrder.Add(dataNode);
+						m_Projects[((ProjectNode)dataNode).Name] = (ProjectNode) dataNode;
+						m_ProjectsOrder.Add((ProjectNode)dataNode);
 					}
                     else if(dataNode is SolutionNode)
                     {
-                        m_Solutions[((SolutionNode)dataNode).Name] = dataNode;
+                        m_Solutions[((SolutionNode)dataNode).Name] = (SolutionNode) dataNode;
                     }
                     else if (dataNode is ProcessNode)
                     {
@@ -349,7 +361,13 @@ namespace Prebuild.Core.Nodes
                     }
                     else if (dataNode is DatabaseProjectNode)
                     {
-                        m_DatabaseProjects[((DatabaseProjectNode)dataNode).Name] = dataNode;
+                        m_DatabaseProjects[((DatabaseProjectNode)dataNode).Name] = (DatabaseProjectNode) dataNode;
+                    }
+                    else if(dataNode is CleanupNode)
+                    {
+                        if(m_Cleanup != null)
+                            throw new WarningException("There can only be one Cleanup node.");
+                        m_Cleanup = (CleanupNode)dataNode;
                     }
 				}
 			}

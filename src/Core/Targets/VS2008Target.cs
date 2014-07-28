@@ -1,6 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Specialized;
 using System.IO;
 using System.Text;
 
@@ -26,9 +24,6 @@ namespace Prebuild.Core.Targets
 		string versionName = "Visual Studio 2008";
 		string name = "vs2008";
 		VSVersion version = VSVersion.VS90;
-
-		Hashtable tools;
-		Kernel kernel;
 
 		/// <summary>
 		/// Gets or sets the solution version.
@@ -96,7 +91,26 @@ namespace Prebuild.Core.Targets
 				return name;
 			}
 		}
-		#endregion
+
+        protected override string GetToolsVersionXml(FrameworkVersion frameworkVersion)
+        {
+            switch (frameworkVersion)
+            {
+                case FrameworkVersion.v3_5:
+                    return "ToolsVersion=\"3.5\"";
+                case FrameworkVersion.v3_0:
+                    return "ToolsVersion=\"3.0\"";
+                default:
+                    return "ToolsVersion=\"2.0\"";
+            }
+        }
+
+        public override string SolutionTag
+        {
+            get { return "# Visual Studio 2008"; }
+        }
+
+	    #endregion
 
 		#region Constructors
 

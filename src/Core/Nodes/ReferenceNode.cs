@@ -23,15 +23,6 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY O
 */
 #endregion
 
-#region CVS Information
-/*
- * $Source$
- * $Author: jendave $
- * $Date: 2006-07-25 09:56:49 -0700 (Tue, 25 Jul 2006) $
- * $Revision: 132 $
- */
-#endregion
-
 using System;
 using System.Xml;
 
@@ -45,7 +36,7 @@ namespace Prebuild.Core.Nodes
 	/// 
 	/// </summary>
 	[DataNode("Reference")]
-	public class ReferenceNode : DataNode
+	public class ReferenceNode : DataNode, IComparable
 	{
 		#region Fields
 
@@ -68,10 +59,6 @@ namespace Prebuild.Core.Nodes
 			{
 				return m_Name;
 			}
-            set
-            {
-                m_Name = value;
-            }
 		}
 
 		/// <summary>
@@ -143,5 +130,15 @@ namespace Prebuild.Core.Nodes
 		}
 
 		#endregion
+
+        #region IComparable Members
+
+        public int CompareTo(object obj)
+        {
+            ReferenceNode that = (ReferenceNode)obj;
+            return this.m_Name.CompareTo(that.m_Name);
+        }
+
+        #endregion
 	}
 }

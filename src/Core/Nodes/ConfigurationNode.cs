@@ -23,15 +23,6 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY O
 */
 #endregion
 
-#region CVS Information
-/*
- * $Source$
- * $Author: jendave $
- * $Date: 2006-01-27 16:49:58 -0800 (Fri, 27 Jan 2006) $
- * $Revision: 71 $
- */
-#endregion
-
 using System;
 using System.Xml;
 
@@ -45,11 +36,12 @@ namespace Prebuild.Core.Nodes
 	/// 
 	/// </summary>
 	[DataNode("Configuration")]
-	public class ConfigurationNode : DataNode, ICloneable
+	public class ConfigurationNode : DataNode, ICloneable, IComparable
 	{
 		#region Fields
 
 		private string m_Name = "unknown";
+		private string m_Platform = "AnyCPU";
 		private OptionsNode m_Options;
 
 		#endregion
@@ -93,6 +85,33 @@ namespace Prebuild.Core.Nodes
 		}
 
 		/// <summary>
+		/// Identifies the platform for this specific configuration.
+		/// </summary>
+		public string Platform
+		{
+			get
+			{
+				return m_Platform;
+			}
+			set
+			{
+				switch ((value + "").ToLower())
+				{
+				case "x86":
+				case "x64":
+					m_Platform = value;
+					break;
+				case "itanium":
+					m_Platform = "Itanium";
+					break;
+				default:
+					m_Platform = "AnyCPU";
+					break;
+				}
+			}
+		}
+
+		/// <summary>
 		/// Gets the name.
 		/// </summary>
 		/// <value>The name.</value>
@@ -101,6 +120,22 @@ namespace Prebuild.Core.Nodes
 			get
 			{
 				return m_Name;
+			}
+		}
+
+		/// <summary>
+		/// Gets the name and platform for the configuration.
+		/// </summary>
+		/// <value>The name and platform.</value>
+		public string NameAndPlatform
+		{
+			get
+			{
+                string platform = m_Platform;
+                if (platform == "AnyCPU")
+                    platform = "Any CPU";
+
+				return String.Format("{0}|{1}", m_Name, platform);
 			}
 		}
 
@@ -131,7 +166,9 @@ namespace Prebuild.Core.Nodes
 		public override void Parse(XmlNode node)
 		{
 			m_Name = Helper.AttributeValue(node, "name", m_Name);
-			if( node == null )
+			Platform = Helper.AttributeValue(node, "platform", m_Platform);
+
+			if (node == null)
 			{
 				throw new ArgumentNullException("node");
 			}
@@ -168,10 +205,21 @@ namespace Prebuild.Core.Nodes
 		{
 			ConfigurationNode ret = new ConfigurationNode();
 			ret.m_Name = m_Name;
+			ret.m_Platform = m_Platform;
 			m_Options.CopyTo(ret.m_Options);
 			return ret;
 		}
 
 		#endregion
+
+        #region IComparable Members
+
+        public int CompareTo(object obj)
+        {
+            ConfigurationNode that = (ConfigurationNode) obj;
+            return this.m_Name.CompareTo(that.m_Name);
+        }
+
+        #endregion
 	}
 }
