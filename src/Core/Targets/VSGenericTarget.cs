@@ -340,7 +340,6 @@ namespace Prebuild.Core.Targets
 						if (!list.Contains(codebehind))
 							list.Add(codebehind);
 					}
-
 				}
 
 
@@ -371,11 +370,26 @@ namespace Prebuild.Core.Targets
 						ps.WriteLine("		<SubType>Designer</SubType>");
 						ps.WriteLine("	  </EmbeddedResource>");
 						//
-					}
+                    }
+
+                    BuildAction buildAction = project.Files.GetBuildAction(filePath);
 
 					if (subType == SubType.Designer)
-					{
-						ps.WriteLine("	  <EmbeddedResource Include=\"{0}\">", file);
+                    {
+                        string tagName = "EmbeddedResource";
+                        string generatorName = "ResXFileCodeGenerator";
+                        switch(buildAction)
+                        {
+                            case BuildAction.ApplicationDefinition:
+                                tagName = "ApplicationDefinition";
+                                generatorName = "MSBuild:Compile";
+                                break;
+                            case BuildAction.Page:
+                                tagName = "Page";
+                                generatorName = "MSBuild:Compile";
+                                break;
+                        }
+						ps.WriteLine("	  <{0} Include=\"{1}\">", tagName, file);
 						
 						string autogen_name = file.Substring(0, file.LastIndexOf('.')) + ".Designer.cs";
 						string dependent_name = filePath.Substring(0, file.LastIndexOf('.')) + ".cs";
@@ -387,12 +401,12 @@ namespace Prebuild.Core.Targets
 						}
 						else
 						{
-							ps.WriteLine("		<Generator>ResXFileCodeGenerator</Generator>");
+							ps.WriteLine("		<Generator>{0}</Generator>", generatorName);
 							ps.WriteLine("		<LastGenOutput>{0}</LastGenOutput>", Path.GetFileName(autogen_name));
 							ps.WriteLine("		<SubType>" + subType + "</SubType>");
 						}
 						
-						ps.WriteLine("	  </EmbeddedResource>");
+						ps.WriteLine("	  </{0}>", tagName);
 						if (File.Exists(Helper.NormalizePath(autogen_name)))
 						{
 							ps.WriteLine("	  <Compile Include=\"{0}\">", autogen_name);

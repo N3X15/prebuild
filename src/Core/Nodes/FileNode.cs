@@ -128,6 +128,8 @@ namespace Prebuild.Core.Nodes
 		private bool m_Link = false;
 		private string m_LinkPath = string.Empty;
         private bool m_PreservePath = false;
+        private string m_Generator = string.Empty;
+        private string m_GenOutput = string.Empty;
 
 
 		#endregion
@@ -156,20 +158,20 @@ namespace Prebuild.Core.Nodes
 			}
 		}
 
-		/// <summary>
-		/// 
-		/// </summary>
-		public BuildAction BuildAction
-		{
-			get
-			{
-				if (m_BuildAction != null)
-					return m_BuildAction.Value;
-				else
-					return GetBuildActionByFileName(this.Path);
+        /// <summary>
+        /// 
+        /// </summary>
+        public BuildAction BuildAction
+        {
+            get
+            {
+                if (m_BuildAction != null)
+                    return m_BuildAction.Value;
+                else
+                    return GetBuildActionByFileName(this.Path);
 
-			}
-		}
+            }
+        }
 
 		public CopyToOutput CopyToOutput
 		{
@@ -232,6 +234,21 @@ namespace Prebuild.Core.Nodes
             }
         }
 
+        public string Generator
+        {
+            get
+            {
+                return m_Generator;
+            }
+        }
+
+        public string GenOutput
+        {
+            get
+            {
+                return m_GenOutput;
+            }
+        }
 		#endregion
 
 		#region Public Methods
@@ -245,12 +262,22 @@ namespace Prebuild.Core.Nodes
 			string buildAction = Helper.AttributeValue(node, "buildAction", String.Empty);
 			if (buildAction != string.Empty)
 				m_BuildAction = (BuildAction)Enum.Parse(typeof(BuildAction), buildAction);
+
 			string subType = Helper.AttributeValue(node, "subType", string.Empty);
 			if (subType != String.Empty)
-				m_SubType = (SubType)Enum.Parse(typeof(SubType), subType);
+                m_SubType = (SubType)Enum.Parse(typeof(SubType), subType);
 
-            Console.WriteLine("[FileNode]:BuildAction is {0}", buildAction);
+            string generator = Helper.AttributeValue(node, "generator", string.Empty);
+            if (generator != String.Empty)
+                m_Generator = generator;
 
+            string genOutput = Helper.AttributeValue(node, "genOutput", string.Empty);
+            if (genOutput != String.Empty)
+                m_GenOutput = genOutput;
+            else if (m_Generator != String.Empty)
+                throw new InvalidDataException("Generator requires specification of genOutput.");
+
+            //Console.WriteLine("[FileNode]: BuildAction is {0}", buildAction);
 
 			m_ResourceName = Helper.AttributeValue(node, "resourceName", m_ResourceName.ToString());
 			this.m_Link = bool.Parse(Helper.AttributeValue(node, "link", bool.FalseString));
