@@ -28,31 +28,35 @@ namespace Prebuild.Core.Targets
 	/// <summary>
 	/// 
 	/// </summary>
-	public enum VSVersion
-	{
-		/// <summary>
-		/// Visual Studio 2002 
-		/// </summary>
-		VS70,
-		/// <summary>
-		/// Visual Studio 2003 
-		/// </summary>
-		VS71,
-		/// <summary>
-		/// Visual Studio 2005 
-		/// </summary>
-		VS80,
-		/// <summary>
-		/// Visual Studio 2008 
-		/// </summary>
+    public enum VSVersion
+    {
+        /// <summary>
+        /// Visual Studio 2002 
+        /// </summary>
+        VS70,
+        /// <summary>
+        /// Visual Studio 2003 
+        /// </summary>
+        VS71,
+        /// <summary>
+        /// Visual Studio 2005 
+        /// </summary>
+        VS80,
+        /// <summary>
+        /// Visual Studio 2008 
+        /// </summary>
         VS90,
         /// <summary>
         /// Visual Studio 2010 
         /// </summary>
         VS10,
-		/// <summary>
-		/// Visual Studio 2012 
-		/// </summary>
-		VS11
-	}
+        /// <summary>
+        /// Visual Studio 2012 
+        /// </summary>
+        VS11,
+        /// <summary>
+        /// Visual Studio 2013 
+        /// </summary>
+        VS12
+    }
 }
