@@ -20,7 +20,7 @@ namespace Prebuild.Core.Targets
     public class VS2013Target : VSGenericTarget
     {
         #region Fields
-        string solutionVersion = "13.00";
+        string solutionVersion = "12.00";
         string productVersion = "12.0.31101.0";
         string schemaVersion = "2.0";
         string versionName = "Visual Studio 2013";
